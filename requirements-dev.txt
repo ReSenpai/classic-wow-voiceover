@@ -3,3 +3,5 @@ pytest>=8
 lupa>=2.2
 PyYAML>=6
 pymorphy3>=2
+imageio-ffmpeg>=0.5
+mutagen>=1.47
