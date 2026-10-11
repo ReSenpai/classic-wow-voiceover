@@ -1,0 +1,82 @@
+# Реестр голосов и кастинг (дизайн §7). Пилот: Тельдрассил.
+# Это стартовое предложение направлений кастинга — референсы появятся на шаге 10
+# (VoiceDesign или подобранные записи). У голоса с reference_audio обязательны
+# reference_text (точный транскрипт), provenance и license.
+#
+# Поля голоса: voice_id, revision (поднимать при смене референса/параметров — пересинтез),
+# sex (male/female/any), description, seed (по умолчанию — из voice_id),
+# params: {провайдер: {...}}, reference_audio (путь от этой папки), reference_text,
+# provenance, license, test_lines.
+
+voices:
+  - voice_id: nightelf-male-calm
+    revision: "1"
+    sex: male
+    description: Взрослый ночной эльф, спокойный, ровный, негромкий; базовый мужской голос расы.
+    test_lines:
+      - Пусть Элуна осветит твой путь, странник.
+
+  - voice_id: nightelf-male-elder
+    revision: "1"
+    sex: male
+    description: Пожилой друид, глубокий тембр, неторопливо, с весом и лёгкой усталостью.
+    test_lines:
+      - Мы долго спали в Изумрудном Сне, но лес помнит всё.
+
+  - voice_id: nightelf-female-calm
+    revision: "1"
+    sex: female
+    description: Взрослая ночная эльфийка, тёплая, сдержанная; базовый женский голос расы.
+    test_lines:
+      - Будь осторожен в лесу — не все его обитатели дружелюбны.
+
+  - voice_id: nightelf-female-sentinel
+    revision: "1"
+    sex: female
+    description: Молодая часовая, собранная, чёткая, слегка напряжённая; короткие фразы-приказы.
+    test_lines:
+      - Фурболги подбираются к Доланаару. Действуй быстро.
+
+  - voice_id: nightelf-female-priestess
+    revision: "1"
+    sex: female
+    description: Жрица Луны, спокойная, светлая, мелодичная, торжественная без пафоса.
+    test_lines:
+      - Свет Элуны укажет тебе дорогу даже в самой тёмной ночи.
+
+  - voice_id: satyr-male
+    revision: "1"
+    sex: male
+    description: Сатир, хитрый, насмешливый, хрипловатый, с ухмылкой в голосе.
+    test_lines:
+      - Ха-ха! Обманули дурака на четыре кулака!
+
+  - voice_id: narrator
+    revision: "1"
+    sex: any
+    description: Нейтральный рассказчик для предметов и объектов; ровно, без актёрской игры.
+    test_lines:
+      - На камне выбиты древние руны.
+
+casting:
+  npcs:
+    creature:2150: satyr-male          # Зенн Грязное Копыто — раса модели неизвестна
+    creature:3516: nightelf-male-elder # Верховный друид Фэндрал Олений Шлем
+  archetypes:
+    - match: Часовой
+      race: 4
+      sex: female
+      voice: nightelf-female-sentinel
+    - match: Жрица Луны
+      race: 4
+      sex: female
+      voice: nightelf-female-priestess
+    - match: друид
+      race: 4
+      sex: male
+      voice: nightelf-male-elder
+  race_sex:
+    4:male: nightelf-male-calm
+    4:female: nightelf-female-calm
+  narrator: narrator
+  unknown_creature: block   # block — без голоса не синтезируем; narrator — читать рассказчиком
