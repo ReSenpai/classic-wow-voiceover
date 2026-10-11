@@ -96,6 +96,15 @@ def test_toc_metadata(pack):
         assert (pack / relative.replace("\\", "/")).exists(), relative
 
 
+def test_toc_notes_describe_real_rollback(pack):
+    """VoiceOver грузит data-модули даже выключенными (FORCE_ENABLE_DISABLED_MODULES) —
+    откат только удалением папки; описание не должно обещать «просто отключите»."""
+    metadata, _ = parse_toc(pack / f"{MODULE}.toc")
+
+    assert "удалите папку" in metadata["Notes"]
+    assert "Можно отключить" not in metadata["Notes"]
+
+
 def test_sound_length_table_matches_manifest(pack):
     lengths = to_py(lua_table(pack / "generated" / "sound_length_table.lua").SoundLengthLookupByFileName)
     manifest = json.loads((pack / "manifest.json").read_text(encoding="utf-8"))

@@ -51,6 +51,13 @@ voices:
     test_lines:
       - Ха-ха! Обманули дурака на четыре кулака!
 
+  - voice_id: dryad-female
+    revision: "1"
+    sex: female
+    description: Дриада, юная, лёгкая, звонкая, «лесная», с мягкой улыбкой в голосе.
+    test_lines:
+      - Я вижу, тебе удалось найти меня! Мелитар мудро поступил, отправив тебя сюда.
+
   - voice_id: narrator
     revision: "1"
     sex: any
@@ -62,6 +69,7 @@ casting:
   npcs:
     creature:2150: satyr-male          # Зенн Грязное Копыто — раса модели неизвестна
     creature:3516: nightelf-male-elder # Верховный друид Фэндрал Олений Шлем
+    creature:1992: dryad-female        # Тариндрелла — дриада, раса модели неизвестна
   archetypes:
     - match: Часовой
       race: 4

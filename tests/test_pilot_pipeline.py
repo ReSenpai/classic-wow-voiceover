@@ -68,6 +68,17 @@ def test_blocked_and_uncast_lines_are_reported_not_dropped_silently(subset, tmp_
     assert report.files == 5
 
 
+def test_several_corpora_in_one_pack_with_shared_lines(subset, tmp_path):
+    records = read_jsonl(subset)
+    other = tmp_path / "other.jsonl"
+    write_jsonl(records[:1], other)  # та же реплика в двух корпусах — не дубль и не коллизия
+
+    report = build_pilot([subset, other], provider_name="mock", work_dir=tmp_path / "work",
+                         out_dir=tmp_path / "packs", version="0.0.1-test", allow_unreviewed=True)
+
+    assert report.files == 5
+
+
 def test_unreviewed_audio_is_not_exported_by_default(subset, tmp_path):
     report = run(subset, tmp_path)
 

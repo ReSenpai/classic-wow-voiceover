@@ -1,6 +1,7 @@
 """Пилот одной командой: корпус → подготовка текста → кастинг → очередь → TTS → пак.
 
   python -m voru.pipeline --provider mock --allow-unreviewed
+  (по умолчанию пилот Тельдрассила + смоук Тенистой долины для проверки в игре)
 
 Заблокированные реплики и NPC без голоса попадают в отчёт, а не пропадают молча.
 По умолчанию в пак идут только принятые (accepted) записи; --allow-unreviewed берёт
@@ -26,6 +27,7 @@ from voru.providers.base import SynthesisRequest
 MODULE_NAME = "AI_VoiceOverData_Vanilla_RU"
 MODULE_TITLE = "VoiceOver Data - Vanilla (RU)"
 PILOT_CORPUS = REPO_ROOT / "corpus" / "pilot" / "teldrassil.jsonl"
+SMOKE_CORPUS = REPO_ROOT / "corpus" / "smoke" / "shadowglen.jsonl"
 WORK_DIR = REPO_ROOT / "work"
 
 
@@ -42,7 +44,18 @@ def slot_of(content_id: str, player_gender) -> str:
     return f"{content_id}|{player_gender or '-'}"
 
 
-def build_pilot(corpus_path, provider_name: str, work_dir=WORK_DIR, out_dir=None, version="0.1.0-pilot",
+def read_corpora(paths) -> list:
+    """Объединяет корпуса; одна и та же запись в нескольких корпусах учитывается один раз."""
+    records = {}
+    for path in paths:
+        for record in read_jsonl(path):
+            known = records.setdefault(record.content_id, record)
+            if known != record:
+                raise ValueError(f"{record.content_id}: разные версии записи в корпусах ({path})")
+    return list(records.values())
+
+
+def build_pilot(corpus_paths, provider_name: str, work_dir=WORK_DIR, out_dir=None, version="0.1.0-pilot",
                 allow_unreviewed: bool = False) -> Report:
     work_dir = Path(work_dir)
     out_dir = Path(out_dir) if out_dir else work_dir / "packs"
@@ -53,7 +66,9 @@ def build_pilot(corpus_path, provider_name: str, work_dir=WORK_DIR, out_dir=None
     report = Report()
 
     planned = []  # (record, variant, voice_id, slot)
-    for record in read_jsonl(corpus_path):
+    if isinstance(corpus_paths, (str, Path)):
+        corpus_paths = [corpus_paths]
+    for record in read_corpora(corpus_paths):
         prepared = prepare_text(record.text_key, record.raw_text, overrides, dictionary)
         if isinstance(prepared, Blocked):
             report.blocked[record.text_key] = prepared.reason
@@ -107,12 +122,13 @@ def build_pilot(corpus_path, provider_name: str, work_dir=WORK_DIR, out_dir=None
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--provider", default="mock")
-    parser.add_argument("--corpus", type=Path, default=PILOT_CORPUS)
+    parser.add_argument("--corpus", type=Path, action="append",
+                        help=f"можно несколько; по умолчанию пилот и смоук: {PILOT_CORPUS.name}, {SMOKE_CORPUS.name}")
     parser.add_argument("--version", default="0.1.0-pilot")
     parser.add_argument("--allow-unreviewed", action="store_true")
     args = parser.parse_args(argv)
 
-    report = build_pilot(args.corpus, args.provider, version=args.version, allow_unreviewed=args.allow_unreviewed)
+    report = build_pilot(args.corpus or [PILOT_CORPUS, SMOKE_CORPUS], args.provider, version=args.version, allow_unreviewed=args.allow_unreviewed)
     print(f"синтез: {report.stats}")
     for key, reason in sorted(report.blocked.items()):
         print(f"  заблокировано {key}: {reason}")

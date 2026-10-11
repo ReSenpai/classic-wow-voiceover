@@ -109,7 +109,10 @@ def _toc(info: PackInfo) -> str:
     lines = [
         f"## Interface: {info.client.interface}",
         f"## Title: {info.title}",
-        "## Notes: Русская озвучка квестов (пилот). Можно отключить — останется предыдущий пак.",
+        # VoiceOver загружает data-модули даже «выключенными» в списке аддонов
+        # (FORCE_ENABLE_DISABLED_MODULES), поэтому честный способ отката — удалить папку.
+        "## Notes: Русская озвучка квестов (пилот). Перекрывает старый пак; для отката удалите папку"
+        " этого аддона и перезапустите клиент. VoiceOver загружает модуль, даже если он выключен.",
         f"## Version: {info.version}",
         "## LoadOnDemand: 1",
         "## RequiredDeps: AI_VoiceOver",
