@@ -59,3 +59,17 @@ def test_quests_with_different_accept_and_complete_speakers(pilot):
 
 def test_all_lines_have_russian_text(pilot):
     assert all(r.locale_status == "ok" for r in pilot)
+
+
+def test_all_pilot_lines_prepare_with_repo_overrides(pilot):
+    from voru.normalize.prepare import Blocked, load_overrides, prepare_text
+    from voru.normalize.pronunciation import load_dictionary
+
+    overrides, dictionary = load_overrides(), load_dictionary()
+    blocked = {}
+    for r in pilot:
+        result = prepare_text(r.text_key, r.raw_text, overrides, dictionary)
+        if isinstance(result, Blocked):
+            blocked[r.text_key] = result.reason
+
+    assert blocked == {}
