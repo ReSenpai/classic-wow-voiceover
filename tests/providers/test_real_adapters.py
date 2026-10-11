@@ -96,6 +96,36 @@ def test_qwen_revision_is_pinned():
     assert len(QWEN_BASE_REVISION) == 40
 
 
+def test_qwen_loads_from_pinned_snapshot(monkeypatch):
+    """qwen-tts грузит процессор и generate_config без revision — закрепляем весь снимок репозитория."""
+    import sys
+    import types
+
+    calls = {}
+    hub = types.SimpleNamespace(snapshot_download=lambda repo, revision: calls.setdefault("snapshot", (repo, revision))
+                                and "/cache/qwen-base")
+    torch = types.SimpleNamespace(bfloat16="bf16")
+
+    class FakeModelClass:
+        @staticmethod
+        def from_pretrained(path, **kwargs):
+            calls["from_pretrained"] = (path, kwargs)
+            return "model"
+
+    monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
+    monkeypatch.setitem(sys.modules, "torch", torch)
+    monkeypatch.setitem(sys.modules, "qwen_tts", types.SimpleNamespace(Qwen3TTSModel=FakeModelClass))
+
+    provider = Qwen3BaseProvider()
+    provider._load()
+
+    assert calls["snapshot"] == (QWEN_BASE_REPO, QWEN_BASE_REVISION)
+    path, kwargs = calls["from_pretrained"]
+    assert path == "/cache/qwen-base"
+    assert "revision" not in kwargs
+    assert kwargs["dtype"] == "bf16"
+
+
 # --- F5-TTS Russian ---
 
 def test_f5_keeps_stress_marks_and_passes_seed(tmp_path, reference):
@@ -112,12 +142,53 @@ def test_f5_keeps_stress_marks_and_passes_seed(tmp_path, reference):
     assert call["nfe_step"] == 48
 
 
+def test_f5_loads_pinned_checkpoint_vocab_and_vocoder(monkeypatch):
+    import sys
+    import types
+
+    from voru.providers.f5_ru import F5_VOCAB, VOCOS_REPO, VOCOS_REVISION
+
+    calls = {"files": []}
+    hub = types.SimpleNamespace(
+        hf_hub_download=lambda repo, filename, revision: calls["files"].append((repo, filename, revision))
+        or f"/cache/{filename}",
+        snapshot_download=lambda repo, revision: calls.setdefault("vocoder", (repo, revision)) and "/cache/vocos",
+    )
+
+    class FakeF5TTS:
+        def __init__(self, **kwargs):
+            calls["init"] = kwargs
+
+    audio_segment = types.SimpleNamespace(converter=None)
+    monkeypatch.setitem(sys.modules, "huggingface_hub", hub)
+    monkeypatch.setitem(sys.modules, "f5_tts", types.SimpleNamespace())
+    monkeypatch.setitem(sys.modules, "f5_tts.api", types.SimpleNamespace(F5TTS=FakeF5TTS))
+    monkeypatch.setitem(sys.modules, "pydub", types.SimpleNamespace(AudioSegment=audio_segment))
+    monkeypatch.setitem(sys.modules, "imageio_ffmpeg", types.SimpleNamespace(get_ffmpeg_exe=lambda: "/bin/ffmpeg"))
+
+    provider = F5RuV4Provider()
+    provider._load()
+
+    assert calls["files"] == [(F5_REPO, provider.checkpoint, F5_REVISION), (F5_REPO, F5_VOCAB, F5_REVISION)]
+    assert calls["vocoder"] == (VOCOS_REPO, VOCOS_REVISION)
+    assert calls["init"]["ckpt_file"] == f"/cache/{provider.checkpoint}"
+    assert calls["init"]["vocab_file"] == f"/cache/{F5_VOCAB}"
+    assert calls["init"]["vocoder_local_path"] == "/cache/vocos"
+    assert audio_segment.converter == "/bin/ffmpeg"
+
+
+def test_f5_revision_includes_vocoder():
+    from voru.providers.f5_ru import VOCOS_REVISION
+
+    assert VOCOS_REVISION[:7] in F5RuV2Provider().model_revision()
+
+
 @pytest.mark.parametrize("provider_class, checkpoint", [
     (F5RuV2Provider, "F5TTS_v1_Base_v2/model_last_inference.safetensors"),
     (F5RuV4Provider, "F5TTS_v1_Base_v4_winter/model_212000.safetensors"),
 ])
 def test_f5_checkpoints_are_pinned(provider_class, checkpoint):
-    assert provider_class().model_revision() == f"{F5_REPO}@{F5_REVISION}:{checkpoint}"
+    assert provider_class().model_revision().startswith(f"{F5_REPO}@{F5_REVISION}:{checkpoint}")
     assert len(F5_REVISION) == 40
 
 

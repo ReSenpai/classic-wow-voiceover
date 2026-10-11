@@ -10,6 +10,9 @@ F5_REPO = "Misha24-10/F5-TTS_RUSSIAN"
 F5_REVISION = "ea166adeae4c80ec5ee423a671e2bdb83906cf84"
 F5_VOCAB = "F5TTS_v1_Base/vocab.txt"
 F5_ARCHITECTURE = "F5TTS_v1_Base"
+# Вокодер F5 по умолчанию качается без ревизии — закрепляем и передаём локальной папкой.
+VOCOS_REPO = "charactr/vocos-mel-24khz"
+VOCOS_REVISION = "0feb3fdd929bcd6649e0e7c5a688cf7dd012ef21"
 
 
 class _F5RuProvider(Provider):
@@ -28,15 +31,20 @@ class _F5RuProvider(Provider):
     )
 
     def model_revision(self) -> str:
-        return f"{F5_REPO}@{F5_REVISION}:{self.checkpoint}"
+        return f"{F5_REPO}@{F5_REVISION}:{self.checkpoint}+{VOCOS_REPO}@{VOCOS_REVISION[:12]}"
 
     def _load(self):
+        import imageio_ffmpeg
         from f5_tts.api import F5TTS
-        from huggingface_hub import hf_hub_download
+        from huggingface_hub import hf_hub_download, snapshot_download
+        from pydub import AudioSegment
 
+        AudioSegment.converter = imageio_ffmpeg.get_ffmpeg_exe()  # pydub читает референс через ffmpeg
         ckpt = hf_hub_download(F5_REPO, self.checkpoint, revision=F5_REVISION)
         vocab = hf_hub_download(F5_REPO, F5_VOCAB, revision=F5_REVISION)
-        self._model = F5TTS(model=F5_ARCHITECTURE, ckpt_file=ckpt, vocab_file=vocab, device="cuda")
+        vocoder = snapshot_download(VOCOS_REPO, revision=VOCOS_REVISION)
+        self._model = F5TTS(model=F5_ARCHITECTURE, ckpt_file=ckpt, vocab_file=vocab,
+                            vocoder_local_path=vocoder, device="cuda")
 
     def _generate(self, model_text, request):
         config = dict(request.generation_config)

@@ -30,7 +30,7 @@ def masters(tmp_path):
 
 def test_empty_queue(queue, masters):
     """Регрессия legacy: пустая выборка не должна ронять генерацию."""
-    assert run_worker(queue, MockProvider(), "w1", masters) == {"generated": 0, "failed": 0, "retried": 0}
+    assert run_worker(queue, MockProvider(), "w1", masters) == {"generated": 0, "failed": 0, "retried": 0, "qa_failed": 0, "review_required": 0}
 
 
 def test_jobs_are_synthesized_into_masters(queue, masters):
@@ -39,7 +39,7 @@ def test_jobs_are_synthesized_into_masters(queue, masters):
 
     stats = run_worker(queue, provider, "w1", masters)
 
-    assert stats == {"generated": 3, "failed": 0, "retried": 0}
+    assert stats == {"generated": 3, "failed": 0, "retried": 0, "qa_failed": 0, "review_required": 0}
     for job_id in ids:
         job = queue.get(job_id)
         assert job.state == "generated"
@@ -79,7 +79,7 @@ def test_unsupported_option_fails_without_retry(queue, masters):
 
     stats = run_worker(queue, provider, "w1", masters)
 
-    assert stats == {"generated": 0, "failed": 1, "retried": 0}
+    assert stats == {"generated": 0, "failed": 1, "retried": 0, "qa_failed": 0, "review_required": 0}
     job = queue.get(job_id)
     assert job.attempts == 1
     assert "unsupported_language" in job.last_error
@@ -109,7 +109,7 @@ def test_transient_error_is_retried(queue, masters):
 
     stats = run_worker(queue, Flaky(failures=1), "w1", masters)
 
-    assert stats == {"generated": 1, "failed": 0, "retried": 1}
+    assert stats == {"generated": 1, "failed": 0, "retried": 1, "qa_failed": 0, "review_required": 0}
     assert queue.get(job_id).attempts == 2
 
 
@@ -118,7 +118,7 @@ def test_persistent_error_ends_in_failed(queue, masters):
 
     stats = run_worker(queue, Flaky(failures=99), "w1", masters)
 
-    assert stats == {"generated": 0, "failed": 1, "retried": MAX_ATTEMPTS - 1}
+    assert stats == {"generated": 0, "failed": 1, "retried": MAX_ATTEMPTS - 1, "qa_failed": 0, "review_required": 0}
     assert "CUDA out of memory" in queue.get(job_id).last_error
 
 
@@ -130,6 +130,61 @@ def test_jobs_of_other_provider_are_not_taken(queue, masters):
 
     assert run_worker(queue, MockProvider(), "w1", masters)["generated"] == 0
     assert queue.summary() == {"pending": 1}
+
+
+class Silent(MockProvider):
+    def _generate(self, model_text, request):
+        samples, sr = super()._generate(model_text, request)
+        return [0.0] * len(samples), sr
+
+
+class Dragging(MockProvider):
+    """Тянет звук втрое дольше нормы — как зациклившаяся модель."""
+    def _generate(self, model_text, request):
+        samples, sr = super()._generate(model_text, request)
+        return samples * 5, sr
+
+
+def test_qa_marks_silent_audio_as_failed(queue, masters):
+    job_id = enqueue_synthesis(queue, "slot-a", Silent(), req(text="Привет, путник, как твои дела сегодня?"), 1)
+
+    stats = run_worker(queue, Silent(), "w1", masters)
+
+    job = queue.get(job_id)
+    assert job.state == "qa_failed"
+    assert "silent" in job.last_error
+    assert stats["qa_failed"] == 1 and stats["generated"] == 0
+
+
+def test_qa_marks_dragging_audio_as_failed(queue, masters):
+    job_id = enqueue_synthesis(queue, "slot-a", Dragging(), req(text="Привет, путник, как твои дела сегодня?"), 1)
+
+    run_worker(queue, Dragging(), "w1", masters)
+
+    assert queue.get(job_id).state == "qa_failed"
+    assert "too_slow" in queue.get(job_id).last_error
+
+
+def test_clean_mock_audio_passes_qa(queue, masters):
+    job_id = enqueue_synthesis(queue, "slot-a", MockProvider(), req(text="Привет, путник, как твои дела сегодня?"), 1)
+
+    stats = run_worker(queue, MockProvider(), "w1", masters)
+
+    assert queue.get(job_id).state == "generated"
+    assert stats == {"generated": 1, "failed": 0, "retried": 0, "qa_failed": 0, "review_required": 0}
+
+
+def test_text_changed_during_synthesis_does_not_break_qa(queue, masters):
+    class ChangesTextMidway(Silent):
+        def _generate(self, model_text, request):
+            enqueue_synthesis(queue, "slot-a", MockProvider(), req(text="Совсем другой текст реплики."), 1)
+            return super()._generate(model_text, request)
+
+    old = enqueue_synthesis(queue, "slot-a", MockProvider(), req(text="Привет, путник, как твои дела сегодня?"), 1)
+
+    run_worker(queue, ChangesTextMidway(), "w1", masters)
+
+    assert queue.get(old).state == "superseded"
 
 
 def test_reference_changed_after_enqueue_is_not_synthesized(queue, masters, tmp_path):

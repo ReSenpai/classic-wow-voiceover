@@ -12,6 +12,17 @@ QWEN_DESIGN_REVISION = "5ecdb67327fd37bb2e042aab12ff7391903235d3"
 LANGUAGES = {"ru": "Russian"}
 
 
+def load_pinned(repo: str, revision: str):
+    """qwen-tts передаёт revision только в AutoModel, а процессор и generate_config грузит
+    с последней версии — поэтому качаем снимок репозитория целиком и грузим из папки."""
+    import torch
+    from huggingface_hub import snapshot_download
+    from qwen_tts import Qwen3TTSModel
+
+    path = snapshot_download(repo, revision=revision)
+    return Qwen3TTSModel.from_pretrained(path, device_map="cuda:0", dtype=torch.bfloat16)
+
+
 def seed_everything(seed: int):
     import random
 
@@ -44,12 +55,7 @@ class Qwen3BaseProvider(Provider):
         return f"{QWEN_BASE_REPO}@{QWEN_BASE_REVISION}"
 
     def _load(self):
-        import torch
-        from qwen_tts import Qwen3TTSModel
-
-        self._model = Qwen3TTSModel.from_pretrained(
-            QWEN_BASE_REPO, revision=QWEN_BASE_REVISION, device_map="cuda:0", dtype=torch.bfloat16,
-        )
+        self._model = load_pinned(QWEN_BASE_REPO, QWEN_BASE_REVISION)
 
     def _apply_seed(self, seed: int):
         seed_everything(seed)
@@ -76,12 +82,7 @@ class QwenVoiceDesigner:
 
     def design(self, text: str, instruct: str, seed: int):
         if self._model is None:
-            import torch
-            from qwen_tts import Qwen3TTSModel
-
-            self._model = Qwen3TTSModel.from_pretrained(
-                QWEN_DESIGN_REPO, revision=QWEN_DESIGN_REVISION, device_map="cuda:0", dtype=torch.bfloat16,
-            )
+            self._model = load_pinned(QWEN_DESIGN_REPO, QWEN_DESIGN_REVISION)
         seed_everything(seed)
         wavs, sample_rate = self._model.generate_voice_design(text=text, language="Russian", instruct=instruct)
         return wavs[0], sample_rate
