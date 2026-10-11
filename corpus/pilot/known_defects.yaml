@@ -12,4 +12,9 @@
   expected_raw_fragment: "Прошу вас, $N, соберите для меня эти грибы."
   legacy_file: translator/assets/wow-classic-ru/AI_VoiceOverData_Vanilla/generated/sounds/quests/947-accept.mp3
   evidence: reference/WowClassic_uh51Hx8CKc.png
-  status: unconfirmed_cause
+  played_file: Interface\AddOns\AI_VoiceOverData_Vanilla\generated\sounds\quests\947-accept.ogg
+  evidence_played_file: reference/WowClassic_q9Ak6fSk44.png
+  # 11.10.2026: пользователь прослушал legacy_file — «Адвенчур» в самом аудио.
+  # Значит, ошибка запечена в аудио старого пака (вероятно, сгенерировано с заменой $N → adventurer).
+  # Текущий REPLACE_DICT дал бы «Герой» — тоже не цель: политика обращений, шаг 2.
+  status: confirmed_in_audio
