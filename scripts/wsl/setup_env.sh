@@ -3,6 +3,7 @@
 # требования к transformers/torch). Запуск из Windows:
 #   wsl -d Ubuntu -- bash /mnt/c/<путь к репо>/scripts/wsl/setup_env.sh qwen
 #   wsl -d Ubuntu -- bash /mnt/c/<путь к репо>/scripts/wsl/setup_env.sh f5
+# Перед первым запуском: sudo apt-get install -y build-essential sox ffmpeg
 # Окружения: ~/voru-envs/<имя>. Код voru подключается из репозитория (editable не нужен:
 # скрипты запускаются из корня репо).
 set -euo pipefail
