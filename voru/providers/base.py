@@ -148,7 +148,7 @@ class Provider(ABC):
             self._loaded = True
         started = time.perf_counter()
         samples, sample_rate = self._generate(self.model_text(request), request)
-        frames = _write_wav_atomically(request.output_path, samples, sample_rate)
+        frames = write_wav_atomically(request.output_path, samples, sample_rate)
         return SynthesisResult(
             path=request.output_path,
             sample_rate=sample_rate,
@@ -164,7 +164,7 @@ def _text_sha256(text: str) -> str:
     return hashlib.sha256(unicodedata.normalize("NFC", text).encode("utf-8")).hexdigest()
 
 
-def _write_wav_atomically(path: Path, samples, sample_rate: int) -> int:
+def write_wav_atomically(path: Path, samples, sample_rate: int) -> int:
     pcm = array.array("h", (int(max(-1.0, min(1.0, s)) * 32767) for s in samples))
     if not pcm:
         raise ValueError(f"{path}: provider returned no audio")

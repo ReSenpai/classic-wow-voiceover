@@ -1,69 +1,94 @@
-# Реестр голосов и кастинг (дизайн §7). Пилот: Тельдрассил.
-# Это стартовое предложение направлений кастинга — референсы появятся на шаге 10
-# (VoiceDesign или подобранные записи). У голоса с reference_audio обязательны
-# reference_text (точный транскрипт), provenance и license.
+# Реестр голосов и кастинг (дизайн §7). Пилот: Тельдрассил + смоук Тенистой долины.
+# Референсы создаются через Qwen3-TTS VoiceDesign (python -m voru.casting.design) и
+# выбираются на слух. У голоса с reference_audio обязательны reference_text
+# (точный транскрипт), provenance и license.
 #
 # Поля голоса: voice_id, revision (поднимать при смене референса/параметров — пересинтез),
-# sex (male/female/any), description, seed (по умолчанию — из voice_id),
-# params: {провайдер: {...}}, reference_audio (путь от этой папки), reference_text,
-# provenance, license, test_lines.
+# sex (male/female/any), description (для людей), design_prompt (для VoiceDesign, англ.),
+# seed (по умолчанию — из voice_id), params: {провайдер: {...}},
+# reference_audio (путь от этой папки), reference_text, provenance, license,
+# test_lines — из них синтезируется референс: 2–3 предложения, ~6–10 секунд, без игровых имён.
 
 voices:
   - voice_id: nightelf-male-calm
     revision: "1"
     sex: male
     description: Взрослый ночной эльф, спокойный, ровный, негромкий; базовый мужской голос расы.
+    design_prompt: Adult male night elf, calm and even, soft-spoken baritone, measured pace, warm but reserved.
     test_lines:
-      - Пусть Элуна осветит твой путь, странник.
+      - Пусть луна осветит твой путь, странник.
+      - Лес неспокоен в последние дни, и мы не знаем, что тому причиной.
+      - Будь внимателен и возвращайся, когда закончишь.
 
   - voice_id: nightelf-male-elder
     revision: "1"
     sex: male
     description: Пожилой друид, глубокий тембр, неторопливо, с весом и лёгкой усталостью.
+    design_prompt: Elderly male druid, deep resonant bass voice, slow and deliberate, wise, slightly weary.
     test_lines:
-      - Мы долго спали в Изумрудном Сне, но лес помнит всё.
+      - Мы долго спали, но лес помнит всё, что с ним случилось.
+      - Старые корни болят, когда в землю приходит зло.
+      - Выслушай меня внимательно, у нас мало времени.
 
   - voice_id: nightelf-female-calm
     revision: "1"
     sex: female
     description: Взрослая ночная эльфийка, тёплая, сдержанная; базовый женский голос расы.
+    design_prompt: Adult female night elf, warm and composed alto voice, gentle, calm pace.
     test_lines:
-      - Будь осторожен в лесу — не все его обитатели дружелюбны.
+      - Будь осторожен в лесу, не все его обитатели дружелюбны.
+      - Я буду ждать тебя здесь, у ручья.
+      - Если найдёшь что-нибудь странное, сразу возвращайся ко мне.
 
   - voice_id: nightelf-female-sentinel
     revision: "1"
     sex: female
     description: Молодая часовая, собранная, чёткая, слегка напряжённая; короткие фразы-приказы.
+    design_prompt: Young female sentinel warrior, firm and focused, crisp articulation, slightly tense, commanding.
     test_lines:
-      - Фурболги подбираются к Доланаару. Действуй быстро.
+      - Враги подбираются к деревне с севера.
+      - Действуй быстро и не теряй бдительности.
+      - Возвращайся с докладом, как только всё разведаешь.
 
   - voice_id: nightelf-female-priestess
     revision: "1"
     sex: female
     description: Жрица Луны, спокойная, светлая, мелодичная, торжественная без пафоса.
+    design_prompt: Female moon priestess, serene and luminous, melodic soprano, solemn without being theatrical.
     test_lines:
-      - Свет Элуны укажет тебе дорогу даже в самой тёмной ночи.
+      - Свет луны укажет тебе дорогу даже в самой тёмной ночи.
+      - Не бойся, ты не один в этом пути.
+      - Ступай с миром и помни о тех, кто ждёт твоего возвращения.
 
   - voice_id: satyr-male
     revision: "1"
     sex: male
     description: Сатир, хитрый, насмешливый, хрипловатый, с ухмылкой в голосе.
+    design_prompt: Male satyr trickster, raspy and sly, mocking tone, grinning, playful menace.
     test_lines:
-      - Ха-ха! Обманули дурака на четыре кулака!
+      - Ха-ха! Хорошая работёнка, ничего не скажешь!
+      - Кто бы мог подумать, что ты так легко согласишься помочь.
+      - Мир полон неожиданностей, не правда ли?
 
   - voice_id: dryad-female
     revision: "1"
     sex: female
     description: Дриада, юная, лёгкая, звонкая, «лесная», с мягкой улыбкой в голосе.
+    design_prompt: Young forest dryad, light and bright female voice, airy and playful, gentle smile in the voice.
     test_lines:
-      - Я вижу, тебе удалось найти меня! Мелитар мудро поступил, отправив тебя сюда.
+      - Я вижу, тебе удалось найти меня!
+      - Лес шепчет о тебе с самого утра.
+      - Не торопись, здесь, под листвой, время течёт иначе.
 
   - voice_id: narrator
     revision: "1"
     sex: any
     description: Нейтральный рассказчик для предметов и объектов; ровно, без актёрской игры.
+    design_prompt: Neutral audiobook narrator, clear and even, unhurried, no acting, mid-range voice.
     test_lines:
       - На камне выбиты древние руны.
+      - Надпись почти стёрлась, но её ещё можно прочесть.
+      - Кто-то оставил здесь послание много лет назад.
 
 casting:
   npcs:

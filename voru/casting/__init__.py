@@ -42,6 +42,7 @@ class VoiceProfile:
     provenance: Optional[str] = None
     license: Optional[str] = None
     test_lines: tuple = ()
+    design_prompt: Optional[str] = None  # описание для VoiceDesign, если отличается от description
 
     def params_for(self, provider: str) -> dict:
         return dict(self.params.get(provider, {}))
@@ -100,6 +101,7 @@ def _profile(raw: dict) -> VoiceProfile:
         provenance=raw.get("provenance"),
         license=raw.get("license"),
         test_lines=tuple(raw.get("test_lines") or ()),
+        design_prompt=raw.get("design_prompt"),
     )
 
 
