@@ -1,12 +1,15 @@
 import subprocess
 import sys
 
+import pytest
+
 HEAVY_MODULES = ("torch", "TTS", "pymysql", "pandas")
 
 
-def test_import_voru_does_not_pull_heavy_dependencies():
+@pytest.mark.parametrize("module", ["voru", "voru.providers", "voru.normalize.prepare"])
+def test_import_does_not_pull_heavy_dependencies(module):
     code = (
-        "import sys, voru; "
+        f"import sys, {module}; "
         f"print([m for m in {HEAVY_MODULES!r} if m in sys.modules])"
     )
     out = subprocess.run(
