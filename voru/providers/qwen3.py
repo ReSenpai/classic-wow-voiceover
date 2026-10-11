@@ -80,9 +80,14 @@ class QwenVoiceDesigner:
     def __init__(self):
         self._model = None
 
-    def design(self, text: str, instruct: str, seed: int):
+    def design_batch(self, texts: list, instructs: list, seed: int) -> list:
+        """Несколько вариантов за один проход модели; случайность общая на батч."""
         if self._model is None:
             self._model = load_pinned(QWEN_DESIGN_REPO, QWEN_DESIGN_REVISION)
         seed_everything(seed)
-        wavs, sample_rate = self._model.generate_voice_design(text=text, language="Russian", instruct=instruct)
-        return wavs[0], sample_rate
+        wavs, sample_rate = self._model.generate_voice_design(
+            text=list(texts), language=["Russian"] * len(texts), instruct=list(instructs))
+        return [(wav, sample_rate) for wav in wavs]
+
+    def design(self, text: str, instruct: str, seed: int):
+        return self.design_batch([text], [instruct], seed)[0]

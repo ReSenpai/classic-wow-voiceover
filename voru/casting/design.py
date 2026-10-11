@@ -14,6 +14,8 @@ import datetime
 import json
 import re
 import shutil
+import time
+import wave
 from pathlib import Path
 
 from voru.casting import CASTING_PATH, load_casting
@@ -30,20 +32,29 @@ def _candidate_dir(work_dir, voice_id) -> Path:
     return Path(work_dir) / DESIGN_DIR / voice_id
 
 
-def design_candidates(casting, voice_id: str, designer, work_dir, count: int = 3) -> list:
+def design_candidates(casting, voice_id: str, designer, work_dir, count: int = 3, batch_size: int = 8) -> list:
+    """Кандидаты считаются батчами: генерация упирается в накладные расходы Python на каждый шаг,
+    а не в GPU, поэтому N вариантов за один проход почти не дороже одного.
+    Номер кандидата seed-N — для имени и pick; случайность общая на батч (batch_seed)."""
     profile = casting.voices[voice_id]
     if not profile.test_lines:
         raise ValueError(f"voice {voice_id}: нужны test_lines — из них синтезируется референс")
     text = " ".join(profile.test_lines)
     instruct = profile.design_prompt or profile.description
+    existing = [int(p.stem.removeprefix("seed-")) for p in _candidate_dir(work_dir, voice_id).glob("seed-*.wav")]
+    start = max(existing) + 1 if existing else profile.seed  # дописываем, понравившиеся не перезаписываем
     paths = []
-    for seed in range(profile.seed, profile.seed + count):
-        samples, sample_rate = designer.design(text=text, instruct=instruct, seed=seed)
-        path = _candidate_dir(work_dir, voice_id) / f"seed-{seed}.wav"
-        write_wav_atomically(path, samples, sample_rate)
-        path.with_suffix(".json").write_text(
-            json.dumps({"text": text, "instruct": instruct, "seed": seed}, ensure_ascii=False), encoding="utf-8")
-        paths.append(path)
+    for batch_seed in range(start, start + count, batch_size):
+        size = min(batch_size, start + count - batch_seed)
+        results = designer.design_batch(texts=[text] * size, instructs=[instruct] * size, seed=batch_seed)
+        for index, (samples, sample_rate) in enumerate(results):
+            seed = batch_seed + index
+            path = _candidate_dir(work_dir, voice_id) / f"seed-{seed}.wav"
+            write_wav_atomically(path, samples, sample_rate)
+            meta = {"text": text, "instruct": instruct, "seed": seed,
+                    "batch_seed": batch_seed, "batch_index": index, "batch_size": size}
+            path.with_suffix(".json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+            paths.append(path)
     return paths
 
 
@@ -96,6 +107,53 @@ def pick_candidate(voices_path, voice_id: str, work_dir, seed: int, designer_rev
     load_casting(voices_path)  # правка должна оставить реестр валидным
 
 
+F5_MAX_REFERENCE_S = 12.0  # F5 обрезает референс — транскрипт перестаёт совпадать со звуком
+
+
+def candidates_page(work_dir) -> Path:
+    """index.html со всеми кандидатами: плееры, текст, флаги QA и готовая команда pick."""
+    import html
+    import wave
+
+    from voru.qa.audio import check_audio
+
+    root = Path(work_dir) / DESIGN_DIR
+    sections = []
+    for voice_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+        rows = []
+        for wav_path in sorted(voice_dir.glob("seed-*.wav")):
+            meta = json.loads(wav_path.with_suffix(".json").read_text(encoding="utf-8"))
+            with wave.open(str(wav_path)) as w:
+                seconds = w.getnframes() / w.getframerate()
+            notes = [f"{f.reason}: {f.detail}" for f in check_audio(wav_path, meta["text"])]
+            if seconds > F5_MAX_REFERENCE_S:
+                notes.append(f"{seconds:.1f} с — длиннее 12 с: F5 обрежет референс")
+            seed = wav_path.stem.removeprefix("seed-")
+            command = f"python -m voru.casting.design pick --voice {voice_dir.name} --seed {seed}"
+            rows.append(
+                f'<div class="cand"><audio controls preload="none" src="{voice_dir.name}/{wav_path.name}"></audio>'
+                f"<span>seed {seed} · {seconds:.1f} с</span><code>{html.escape(command)}</code>"
+                f'<p class="prompt">{html.escape(meta["instruct"])}</p>'
+                + "".join(f'<p class="warn">{html.escape(n)}</p>' for n in notes) + "</div>")
+        text = json.loads(next(voice_dir.glob("seed-*.json")).read_text(encoding="utf-8")) if rows else {}
+        sections.append(f"<section><h2>{html.escape(voice_dir.name)}</h2>"
+                        f"<p><i>{html.escape(text.get('text', ''))}</i></p>"
+                        f"{''.join(rows)}</section>")
+    style = (":root{--bg:#fafaf8;--fg:#1d1d1b;--line:#deddd8;--warn:#a8552b}"
+             "@media(prefers-color-scheme:dark){:root{--bg:#171716;--fg:#ecebe6;--line:#3a3a36;--warn:#e0915f}}"
+             "body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif}"
+             "main{max-width:900px;margin:0 auto}section{border-bottom:1px solid var(--line);padding:8px 0}"
+             ".cand{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:6px 0}"
+             "audio{width:320px;max-width:100%}code{font-size:12px}.warn{color:var(--warn);margin:0;width:100%}"
+             ".prompt{opacity:.7;font-size:13px;margin:0;width:100%}")
+    page = root / "index.html"
+    page.write_text(f'<!doctype html><html lang="ru"><head><meta charset="utf-8">'
+                    f'<meta name="viewport" content="width=device-width, initial-scale=1"><title>Кандидаты голосов</title>'
+                    f"<style>{style}</style></head><body><main><h1>Кандидаты голосов</h1>{''.join(sections)}"
+                    f"</main></body></html>\n", encoding="utf-8")
+    return page
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -103,6 +161,7 @@ def main(argv=None):
     gen.add_argument("--voice", action="append", default=[])
     gen.add_argument("--all", action="store_true")
     gen.add_argument("--count", type=int, default=3)
+    gen.add_argument("--batch-size", type=int, default=8)
     pick = sub.add_parser("pick")
     pick.add_argument("--voice", required=True)
     pick.add_argument("--seed", type=int, required=True)
@@ -117,8 +176,11 @@ def main(argv=None):
         voices = list(casting.voices) if args.all else args.voice
         designer = QwenVoiceDesigner()
         for voice_id in voices:
-            for path in design_candidates(casting, voice_id, designer, args.work_dir, args.count):
-                print(path)
+            started = time.perf_counter()
+            paths = design_candidates(casting, voice_id, designer, args.work_dir, args.count, args.batch_size)
+            elapsed = time.perf_counter() - started
+            audio = sum(wave.open(str(p)).getnframes() / wave.open(str(p)).getframerate() for p in paths)
+            print(f"{voice_id}: {len(paths)} шт., звук {audio:.0f} с за {elapsed:.0f} с, RTF {elapsed / audio:.2f}")
     else:
         pick_candidate(CASTING_PATH, args.voice, args.work_dir, args.seed,
                        QwenVoiceDesigner.model_revision, datetime.date.today().isoformat())

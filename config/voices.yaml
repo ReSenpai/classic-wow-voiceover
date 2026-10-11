@@ -7,18 +7,21 @@
 # sex (male/female/any), description (для людей), design_prompt (для VoiceDesign, англ.),
 # seed (по умолчанию — из voice_id), params: {провайдер: {...}},
 # reference_audio (путь от этой папки), reference_text, provenance, license,
-# test_lines — из них синтезируется референс: 2–3 предложения, ~6–10 секунд, без игровых имён.
+# test_lines — из них синтезируется референс: 2 предложения, ≤12 с (F5 обрезает длиннее), без игровых имён.
 
 voices:
   - voice_id: nightelf-male-calm
-    revision: "1"
+    revision: "2"
+    reference_audio: "voice_refs/nightelf-male-calm.wav"
+    reference_text: "Пусть луна осветит твой путь, странник. Лес неспокоен в последние дни, и мы не знаем, что тому причиной."
+    provenance: "Qwen3-TTS VoiceDesign Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign@5ecdb67327fd37bb2e042aab12ff7391903235d3, seed 2071980, 2026-10-11"
+    license: "Apache-2.0 (модель Qwen3-TTS); голос сгенерирован проектом"
     sex: male
     description: Взрослый ночной эльф, спокойный, ровный, негромкий; базовый мужской голос расы.
     design_prompt: Adult male night elf, calm and even, soft-spoken baritone, measured pace, warm but reserved.
     test_lines:
       - Пусть луна осветит твой путь, странник.
       - Лес неспокоен в последние дни, и мы не знаем, что тому причиной.
-      - Будь внимателен и возвращайся, когда закончишь.
 
   - voice_id: nightelf-male-elder
     revision: "1"
@@ -28,7 +31,6 @@ voices:
     test_lines:
       - Мы долго спали, но лес помнит всё, что с ним случилось.
       - Старые корни болят, когда в землю приходит зло.
-      - Выслушай меня внимательно, у нас мало времени.
 
   - voice_id: nightelf-female-calm
     revision: "1"
@@ -38,17 +40,15 @@ voices:
     test_lines:
       - Будь осторожен в лесу, не все его обитатели дружелюбны.
       - Я буду ждать тебя здесь, у ручья.
-      - Если найдёшь что-нибудь странное, сразу возвращайся ко мне.
 
   - voice_id: nightelf-female-sentinel
     revision: "1"
     sex: female
-    description: Молодая часовая, собранная, чёткая, слегка напряжённая; короткие фразы-приказы.
-    design_prompt: Young female sentinel warrior, firm and focused, crisp articulation, slightly tense, commanding.
+    description: Часовая-воительница, взрослая, закалённая в боях; низкий твёрдый голос, приказной тон, без «девчачести».
+    design_prompt: Adult female warrior, battle-hardened sentinel, low firm alto voice, steady and commanding, terse, controlled intensity, mature and strong, not girlish.
     test_lines:
       - Враги подбираются к деревне с севера.
       - Действуй быстро и не теряй бдительности.
-      - Возвращайся с докладом, как только всё разведаешь.
 
   - voice_id: nightelf-female-priestess
     revision: "1"
@@ -58,7 +58,6 @@ voices:
     test_lines:
       - Свет луны укажет тебе дорогу даже в самой тёмной ночи.
       - Не бойся, ты не один в этом пути.
-      - Ступай с миром и помни о тех, кто ждёт твоего возвращения.
 
   - voice_id: satyr-male
     revision: "1"
@@ -68,27 +67,24 @@ voices:
     test_lines:
       - Ха-ха! Хорошая работёнка, ничего не скажешь!
       - Кто бы мог подумать, что ты так легко согласишься помочь.
-      - Мир полон неожиданностей, не правда ли?
 
   - voice_id: dryad-female
     revision: "1"
     sex: female
-    description: Дриада, юная, лёгкая, звонкая, «лесная», с мягкой улыбкой в голосе.
-    design_prompt: Young forest dryad, light and bright female voice, airy and playful, gentle smile in the voice.
+    description: Дриада — молодая девушка, полная энергии; звонкий, живой, уверенный голос, не детский.
+    design_prompt: Young adult woman full of energy, bright ringing clear voice, lively and enthusiastic, confident and warm, mid-range pitch, not childish, not a little girl.
     test_lines:
       - Я вижу, тебе удалось найти меня!
       - Лес шепчет о тебе с самого утра.
-      - Не торопись, здесь, под листвой, время течёт иначе.
 
   - voice_id: narrator
     revision: "1"
     sex: any
-    description: Нейтральный рассказчик для предметов и объектов; ровно, без актёрской игры.
-    design_prompt: Neutral audiobook narrator, clear and even, unhurried, no acting, mid-range voice.
+    description: Рассказчик для предметов и объектов — мудрый старец-сказитель в духе Гэндальфа; глубокий тёплый голос, неспешно.
+    design_prompt: Wise old man storyteller, deep warm slightly gravelly bass voice, slow and deliberate narration, gentle authority, like an ancient wizard telling a legend by the fire.
     test_lines:
       - На камне выбиты древние руны.
       - Надпись почти стёрлась, но её ещё можно прочесть.
-      - Кто-то оставил здесь послание много лет назад.
 
 casting:
   npcs:
