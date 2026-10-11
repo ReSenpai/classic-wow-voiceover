@@ -153,6 +153,18 @@ def test_pick_twice_replaces_reference(voices, tmp_path):
     assert voices.read_text(encoding="utf-8").count("reference_audio:") == 1
 
 
+def test_provenance_records_prompt_and_batch(voices, tmp_path):
+    casting = load_casting(voices)
+    seed = casting.voices["dryad-female"].seed
+    design_candidates(casting, "dryad-female", FakeDesigner(), tmp_path / "work", count=3)
+
+    pick_candidate(voices, "dryad-female", tmp_path / "work", seed=seed + 2, designer_revision="r", date="d")
+
+    provenance = load_casting(voices).voices["dryad-female"].provenance
+    assert f"батч {seed}, №3 из 3" in provenance
+    assert "A young playful forest dryad" in provenance  # описание может позже измениться в voices.yaml
+
+
 def test_pick_unknown_candidate(voices, tmp_path):
     with pytest.raises(FileNotFoundError):
         pick_candidate(voices, "dryad-female", tmp_path / "work", seed=999, designer_revision="r", date="d")

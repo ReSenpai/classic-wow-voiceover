@@ -86,6 +86,15 @@ def _set_reference_in_yaml(text: str, voice_id: str, fields: dict) -> str:
     return "".join(lines[:start + 1] + block + lines[end:])
 
 
+def _provenance(meta: dict, designer_revision: str, date: str) -> str:
+    """Происхождение референса: модель, описание (в voices.yaml оно может позже измениться) и случайность.
+    У батча случайность общая — по одному seed звук не воспроизвести, поэтому пишем и батч."""
+    where = f"seed {meta['seed']}"
+    if meta.get("batch_size", 1) > 1:
+        where += f" (батч {meta['batch_seed']}, №{meta['batch_index'] + 1} из {meta['batch_size']})"
+    return f"Qwen3-TTS VoiceDesign {designer_revision}, {where}, {date}; описание: {meta['instruct']}"
+
+
 def pick_candidate(voices_path, voice_id: str, work_dir, seed: int, designer_revision: str, date: str):
     voices_path = Path(voices_path)
     source = _candidate_dir(work_dir, voice_id) / f"seed-{seed}.wav"
@@ -99,7 +108,7 @@ def pick_candidate(voices_path, voice_id: str, work_dir, seed: int, designer_rev
     fields = {
         "reference_audio": relative,
         "reference_text": meta["text"],
-        "provenance": f"Qwen3-TTS VoiceDesign {designer_revision}, seed {seed}, {date}",
+        "provenance": _provenance(meta, designer_revision, date),
         "license": DESIGN_LICENSE,
     }
     voices_path.write_text(_set_reference_in_yaml(voices_path.read_text(encoding="utf-8"), voice_id, fields),
