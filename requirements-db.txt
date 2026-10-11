@@ -1,0 +1,5 @@
+# Corpus import from local MySQL (vmangos dump). Not needed for unit tests.
+PyMySQL>=1.1
+python-dotenv>=1.0
+requests>=2.31
+tqdm>=4.66

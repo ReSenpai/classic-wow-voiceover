@@ -27,6 +27,37 @@ def test_punctuated_address_is_removed(raw, expected):
     assert say(raw) == expected
 
 
+@pytest.mark.parametrize("raw, expected", [
+    ("Привет тебе, юный $c. Не окажешь услугу?", "Привет тебе. Не окажешь услугу?"),
+    ("Когда-нибудь мы встретимся, юный $c. Но пока прими награду.", "Когда-нибудь мы встретимся. Но пока прими награду."),
+    ("Тебе удалось, юный $c! Славно!", "Тебе удалось! Славно!"),
+    ("Спасибо, отважный $c, ты помог.", "Спасибо, ты помог."),
+    ("Юный $c, послушай.", "Послушай."),
+    ("Приветствую, юный $c.", "Приветствую."),
+    ("Дорогой $N, слушай.", "Слушай."),
+])
+def test_adjective_with_address_is_removed_together(raw, expected):
+    assert say(raw) == expected
+
+
+@pytest.mark.parametrize("raw", [
+    "Ты весьма достойный и способный $c.",   # не обращение, а сказуемое
+    "Ты, как $c, должен понимать.",
+])
+def test_address_like_phrase_inside_sentence_still_needs_override(raw):
+    with pytest.raises(NeedsOverride):
+        say(raw)
+
+
+@pytest.mark.parametrize("raw, expected", [
+    ("Спасибо тебе, $N Прости мою немногословность.", "Спасибо тебе. Прости мою немногословность."),
+    ("Это очень впечатляет, $N Хотелось бы попросить.", "Это очень впечатляет. Хотелось бы попросить."),
+])
+def test_missing_period_after_address_is_restored(raw, expected):
+    """Опечатка локализации: после обращения нет точки, следующее предложение с заглавной."""
+    assert say(raw) == expected
+
+
 def test_comma_is_kept_when_inner_address_removed():
     """Осознанное ограничение: без синтаксиса не отличить «В отходах, $c, таится» (запятая лишняя)
     от «Если ты гуляешь, $c, то…» (запятая нужна). Лишняя запятая — короткая пауза,
@@ -46,9 +77,7 @@ def test_address_before_paragraph_end():
 
 @pytest.mark.parametrize("raw", [
     "Ты похож на $c.",
-    "Приветствую, юный $c.",
     "Тебя зовут $N?",
-    "Дорогой $N, слушай.",
 ])
 def test_address_inside_phrase_needs_override(raw):
     with pytest.raises(NeedsOverride) as err:

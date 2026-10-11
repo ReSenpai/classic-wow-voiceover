@@ -1,8 +1,9 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-m 'not gpu and not slow'"
+addopts = "-m 'not gpu and not slow and not db'"
 markers = [
     "gpu: нужна реальная TTS-модель на GPU (запуск вручную: pytest -m gpu)",
     "slow: долгий тест",
+    "db: нужна локальная MySQL с дампом vmangos (pytest -m db)",
 ]

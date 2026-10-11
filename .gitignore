@@ -16,3 +16,5 @@ translator/assets/wow-classic-en/AI_VoiceOverData_Vanilla
 translator/assets/wow-classic-ru/AI_VoiceOverData_Vanilla_OGG
 .pytest_cache
 reference
+corpus/local/
+assets/sql/mysql-dump/

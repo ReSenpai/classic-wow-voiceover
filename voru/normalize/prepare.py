@@ -1,5 +1,5 @@
 """Подготовка текста реплики: локаль → override → разметка → варианты пола → обращения →
-числа → проверка остатков → словарь произношения.
+латинские двойники → числа → проверка остатков → словарь произношения.
 
 Ничего не подставляется молча: нет русского текста, сломанная разметка, обращение внутри
 фразы или устаревшая правка дают Blocked с причиной (дизайн §5–6).
@@ -16,7 +16,7 @@ from voru.normalize.address import NeedsOverride, speak
 from voru.normalize.markup import MarkupError, expand_player_gender, parse
 from voru.normalize.numbers import expand_numbers
 from voru.normalize.pronunciation import apply_dictionary
-from voru.normalize.residue import check_residue
+from voru.normalize.residue import check_residue, fix_homoglyphs
 
 OVERRIDES_PATH = REPO_ROOT / "corpus" / "overrides.yaml"
 
@@ -77,5 +77,5 @@ def prepare_text(content_key: str, raw_text: Optional[str], overrides: Optional[
 
 
 def _spoken(tokens, dictionary):
-    text = check_residue(expand_numbers(speak(tokens)))
+    text = check_residue(expand_numbers(fix_homoglyphs(speak(tokens))))
     return apply_dictionary(text, dictionary or {})

@@ -4,9 +4,9 @@
 не разворачиваются автоматически — нужна точечная правка.
 """
 import re
-from functools import lru_cache
 
 from voru.normalize.address import NeedsOverride
+from voru.normalize.morph import morph as _morph
 
 _UNITS = {
     "masc": ["", "один", "два", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять"],
@@ -72,13 +72,6 @@ def _plural(n, forms):
     if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14:
         return forms[1]
     return forms[2]
-
-
-@lru_cache(maxsize=1)
-def _morph():
-    import pymorphy3
-
-    return pymorphy3.MorphAnalyzer()
 
 
 def _agree(n, words, next_word):

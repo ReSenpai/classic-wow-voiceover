@@ -1,7 +1,28 @@
 import pytest
 
 from voru.normalize.address import NeedsOverride
-from voru.normalize.residue import check_residue
+from voru.normalize.residue import check_residue, fix_homoglyphs
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("из Изумрудного Cна", "из Изумрудного Сна"),          # латинская C
+    ("Телcамар и Телcамара", "Телсамар и Телсамара"),
+    ("в тюрьмe", "в тюрьме"),
+    ("Tанариса, Aзероте", "Танариса, Азероте"),
+    ("Cамые лучшие", "Самые лучшие"),
+])
+def test_latin_lookalikes_inside_russian_words_are_fixed(text, expected):
+    assert fix_homoglyphs(text) == expected
+
+
+@pytest.mark.parametrize("text", [
+    "BНо так нельзя",      # сломанный $B — не «ВНо», пусть блокируется
+    "IЯ",
+    "World of Warcraft",   # чисто латинские слова не трогаем
+    "Перфограф B",
+])
+def test_homoglyph_fix_leaves_suspicious_words(text):
+    assert fix_homoglyphs(text) == text
 
 
 @pytest.mark.parametrize("text", [

@@ -16,6 +16,7 @@ from voru.normalize.markup import (
     Text,
     WorldState,
 )
+from voru.normalize.morph import is_adjective_nominative
 
 ADDRESS = "\x00"  # временная метка на месте обращения
 
@@ -28,7 +29,11 @@ _RULES = (
     (re.compile(rf"(^|[.!?…] |\n){ADDRESS} *, *(\w)"), lambda m: m.group(1) + m.group(2).upper()),
     # «Вот так. $N! Иди.» → «Вот так. Иди.»
     (re.compile(rf"(^|[.!?…] |\n){ADDRESS} *[.!?…]+ ?"), lambda m: m.group(1)),
+    # опечатка локализации: «Спасибо тебе, $N Прости…» — после обращения нет точки
+    (re.compile(rf" *, *{ADDRESS} +(?=[А-ЯЁ])"), lambda m: ". "),
 )
+# «, юный $c» / «Юный $c,» — прилагательное входит в обращение и убирается вместе с ним
+_ADJECTIVE_BEFORE_ADDRESS = re.compile(rf"(^|, |[.!?…] |\n)([А-Яа-яЁё]+) {ADDRESS}")
 
 
 class NeedsOverride(ValueError):
@@ -44,6 +49,8 @@ def speak(tokens) -> str:
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r" *\n *", "\n", text)
     had_address = ADDRESS in text
+    text = _ADJECTIVE_BEFORE_ADDRESS.sub(
+        lambda m: m.group(1) + ADDRESS if is_adjective_nominative(m.group(2)) else m.group(), text)
 
     changed = True
     while changed:
