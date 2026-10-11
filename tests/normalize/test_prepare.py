@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from voru.normalize.pronunciation import Entry
 from voru.normalize.prepare import Blocked, Override, Variant, load_overrides, prepare_text, source_hash
 
 # Текст квеста 947 «Грибы из пещеры» (взятие), восстановлен по скриншоту клиента
@@ -76,6 +77,27 @@ def test_stale_override_is_blocked():
     overrides = {"quest:1:accept": Override(source_hash("старый текст"), "правка", "")}
 
     assert prepare_text("quest:1:accept", "новый текст", overrides) == Blocked("stale_override")
+
+
+def test_numbers_are_expanded():
+    (variant,) = prepare_text("quest:1:accept", "Принесите 1 мертвянку, $N.")
+
+    assert variant.spoken_text == "Принесите одну мертвянку."
+
+
+def test_untranslated_english_is_blocked():
+    result = prepare_text("quest:1:accept", "Greetings, $N.")
+
+    assert isinstance(result, Blocked)
+    assert result.reason == "latin_text"
+
+
+def test_pronunciation_dictionary_is_applied():
+    dictionary = {"еще": Entry("еще", "ещё", "test")}
+
+    (variant,) = prepare_text("quest:1:accept", "Еще раз, $N.", dictionary=dictionary)
+
+    assert variant.spoken_text == "Ещё раз."
 
 
 def test_load_overrides_from_yaml(tmp_path: Path):

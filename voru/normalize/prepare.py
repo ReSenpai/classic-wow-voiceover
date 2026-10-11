@@ -1,4 +1,5 @@
-"""Подготовка текста реплики: локаль → override → разметка → варианты пола → устная форма.
+"""Подготовка текста реплики: локаль → override → разметка → варианты пола → обращения →
+числа → проверка остатков → словарь произношения.
 
 Ничего не подставляется молча: нет русского текста, сломанная разметка, обращение внутри
 фразы или устаревшая правка дают Blocked с причиной (дизайн §5–6).
@@ -13,6 +14,9 @@ import yaml
 from voru.config import REPO_ROOT
 from voru.normalize.address import NeedsOverride, speak
 from voru.normalize.markup import MarkupError, expand_player_gender, parse
+from voru.normalize.numbers import expand_numbers
+from voru.normalize.pronunciation import apply_dictionary
+from voru.normalize.residue import check_residue
 
 OVERRIDES_PATH = REPO_ROOT / "corpus" / "overrides.yaml"
 
@@ -52,7 +56,8 @@ def load_overrides(path=OVERRIDES_PATH) -> dict:
     return overrides
 
 
-def prepare_text(content_key: str, raw_text: Optional[str], overrides: Optional[dict] = None):
+def prepare_text(content_key: str, raw_text: Optional[str], overrides: Optional[dict] = None,
+                 dictionary: Optional[dict] = None):
     """Возвращает кортеж Variant либо Blocked."""
     if raw_text is None or not raw_text.strip():
         return Blocked("missing_locale")
@@ -66,6 +71,11 @@ def prepare_text(content_key: str, raw_text: Optional[str], overrides: Optional[
 
     try:
         variants = expand_player_gender(parse(source))
-        return tuple(Variant(gender, speak(tokens)) for gender, tokens in variants.items())
+        return tuple(Variant(gender, _spoken(tokens, dictionary)) for gender, tokens in variants.items())
     except (MarkupError, NeedsOverride) as err:
         return Blocked(err.reason, str(err))
+
+
+def _spoken(tokens, dictionary):
+    text = check_residue(expand_numbers(speak(tokens)))
+    return apply_dictionary(text, dictionary or {})
