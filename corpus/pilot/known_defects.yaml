@@ -1,0 +1,15 @@
+# Дефекты, замеченные в целевом клиенте. Каждый становится регрессионным тестом.
+# status: unconfirmed_cause, пока не сопоставлены текст на экране, текст генератора,
+# проигранный файл и его звук (дизайн §12).
+- id: adventurer-947-accept
+  reported: 2026-10-11
+  client_build: 70003
+  quest_id: 947            # «Грибы из пещеры»
+  stage: accept
+  npc_name: Баритас Лунный Сумрак   # Аубердин
+  symptom: "На месте имени игрока ($N) слышно «Адвенчур»"
+  screen_text_fragment: "Прошу вас, Элиналис, соберите для меня эти грибы."
+  expected_raw_fragment: "Прошу вас, $N, соберите для меня эти грибы."
+  legacy_file: translator/assets/wow-classic-ru/AI_VoiceOverData_Vanilla/generated/sounds/quests/947-accept.mp3
+  evidence: reference/WowClassic_uh51Hx8CKc.png
+  status: unconfirmed_cause

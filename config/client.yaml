@@ -1,0 +1,6 @@
+# Целевой клиент. Источник: /dump GetBuildInfo() в игре, 11.10.2026 (reference/WowClassic_DfLDswn84T.png)
+flavor: vanilla
+version: "1.15.9"
+build: 70003
+interface: 11509
+locale: ruRU

@@ -1,0 +1,4 @@
+# Fast tests for voru/: no torch, no GPU, no MySQL.
+pytest>=8
+lupa>=2.2
+PyYAML>=6
