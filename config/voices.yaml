@@ -76,14 +76,31 @@ voices:
       - Не бойся, ты не один в этом пути.
 
   - voice_id: satyr-male
-    revision: "3"
+    revision: "4"
     reference_audio: "voice_refs/satyr-male.wav"
     reference_text: "Ха-ха! Хорошая работёнка, ничего не скажешь! Кто бы мог подумать, что ты так легко согласишься помочь."
-    provenance: "Qwen3-TTS VoiceDesign Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign@5ecdb67327fd37bb2e042aab12ff7391903235d3, seed 49540815, 2026-10-11; описание: Male satyr trickster, raspy and sly, mocking tone, grinning, playful menace."
+    provenance: "Qwen3-TTS VoiceDesign Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign@5ecdb67327fd37bb2e042aab12ff7391903235d3, seed 49540836 (батч 49540833, №4 из 8), 2026-10-12; описание: Russian-speaking cartoon voice of a spoiled, self-assured boy. Mid-high pitch, distinctly nasal with pinched nasal resonance, slight hoarseness and creaky phrase endings; dense, slightly strained sound, not a thin childish squeak. Bratty, capricious, ostentatiously important manner, sure everyone must obey him; tries to sound authoritative but slides into offended whining at the slightest objection; snide politeness flips into irritation, indignation or a gloating snicker. Uneven rhythm: short clipped phrases alternate with deliberately stretched stressed vowels; strong emphasis on key words; condescending mockery when calm, voice rising, more nasal and cracking when displeased; sharp, comically exaggerated emotional shifts. Natural colloquial Russian, slightly sloppy but clear. Keep the character at low volume, do not shout every line. Avoid deep adult bass, cute baby talk, constant falsetto, flat announcer delivery, mechanical speed-up or digital pitch shifting."
     license: "Apache-2.0 (модель Qwen3-TTS); голос сгенерирован проектом"
     sex: male
-    description: Сатир, хитрый, насмешливый, хрипловатый, с ухмылкой в голосе.
-    design_prompt: Male satyr trickster, raspy and sly, mocking tone, grinning, playful menace.
+    description: >-
+      Русскоязычный мультяшный голос избалованного, самоуверенного мальчика. Тембр средне-высокий,
+      выраженно гнусавый, с зажатым носовым резонансом, лёгкой хрипотцой и скрипучими окончаниями фраз;
+      плотный, немного сдавленный, не тонкий детский писк. Манера наглая, капризная, демонстративно важная;
+      при возражении — обиженное нытьё; ехидная вежливость сменяется раздражением или злорадным смешком.
+      Ритм неровный, ключевые слова с сильным нажимом, растянутые ударные гласные. Не кричать в каждой реплике.
+      Избегать: взрослого баса, младенческого лепета, постоянного фальцета, дикторской ровности.
+      (описание пользователя 12.10.2026; ориентир — Эрик Картман в русском дубляже)
+    design_prompt: >-
+      Russian-speaking cartoon voice of a spoiled, self-assured boy. Mid-high pitch, distinctly nasal with
+      pinched nasal resonance, slight hoarseness and creaky phrase endings; dense, slightly strained sound,
+      not a thin childish squeak. Bratty, capricious, ostentatiously important manner, sure everyone must obey
+      him; tries to sound authoritative but slides into offended whining at the slightest objection; snide
+      politeness flips into irritation, indignation or a gloating snicker. Uneven rhythm: short clipped phrases
+      alternate with deliberately stretched stressed vowels; strong emphasis on key words; condescending
+      mockery when calm, voice rising, more nasal and cracking when displeased; sharp, comically exaggerated
+      emotional shifts. Natural colloquial Russian, slightly sloppy but clear. Keep the character at low volume,
+      do not shout every line. Avoid deep adult bass, cute baby talk, constant falsetto, flat announcer delivery,
+      mechanical speed-up or digital pitch shifting.
     test_lines:
       - Ха-ха! Хорошая работёнка, ничего не скажешь!
       - Кто бы мог подумать, что ты так легко согласишься помочь.
