@@ -105,11 +105,19 @@ def pick_candidate(voices_path, voice_id: str, work_dir, seed: int, designer_rev
     relative = f"{REFS_DIR}/{voice_id}.wav"
     target = voices_path.parent / relative
     target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(source, target)
+    provenance = _provenance(meta, designer_revision, date)
+    fitted = fit_reference(source)  # до записи на место: не влезет — референс остаётся прежним
+    if fitted is None:
+        shutil.copyfile(source, target)
+    else:
+        samples, rate, before, after = fitted
+        write_wav_atomically(target, samples, rate)
+        provenance += (f"; паузы длиннее {FIT_PAUSE_S} с сжаты до {FIT_PAUSE_S} с, края подрезаны "
+                       f"({before:.2f} с → {after:.2f} с, F5 читает не больше {F5_MAX_REFERENCE_S:.0f} с)")
     fields = {
         "reference_audio": relative,
         "reference_text": meta["text"],
-        "provenance": _provenance(meta, designer_revision, date),
+        "provenance": provenance,
         "license": DESIGN_LICENSE,
     }
     voices_path.write_text(_set_reference_in_yaml(voices_path.read_text(encoding="utf-8"), voice_id, fields),
@@ -118,6 +126,42 @@ def pick_candidate(voices_path, voice_id: str, work_dir, seed: int, designer_rev
 
 
 F5_MAX_REFERENCE_S = 12.0  # F5 обрезает референс — транскрипт перестаёт совпадать со звуком
+FIT_PAUSE_S = 0.25  # до скольких сжимаются паузы длинного референса
+_SILENCE_LEVEL = 0.01  # ≈ −40 dBFS
+_EDGE_KEEP_S = 0.05
+
+
+def fit_reference(path):
+    """Референс длиннее F5_MAX_REFERENCE_S укорачивается без смены слов: края подрезаются, паузы
+    длиннее FIT_PAUSE_S сжимаются до FIT_PAUSE_S. Короткий → None. Не влезает → ValueError."""
+    with wave.open(str(path)) as w:
+        rate, frames = w.getframerate(), w.readframes(w.getnframes())
+    import array
+
+    samples = [s / 32768 for s in array.array("h", frames)]
+    before = len(samples) / rate
+    if before <= F5_MAX_REFERENCE_S:
+        return None
+    loud = [i for i, s in enumerate(samples) if abs(s) >= _SILENCE_LEVEL]
+    edge = int(rate * _EDGE_KEEP_S)
+    lo, hi = max(0, loud[0] - edge), min(len(samples), loud[-1] + 1 + edge)
+    win, keep = int(rate * 0.02), int(rate * FIT_PAUSE_S)
+    out, pos, start = [], lo, None
+    for i in range(lo, hi, win):
+        quiet = max(abs(s) for s in samples[i:i + win]) < _SILENCE_LEVEL
+        if quiet and start is None:
+            start = i
+        elif not quiet and start is not None:
+            if i - start > keep:
+                out += samples[pos:start + keep // 2]
+                pos = i - keep // 2
+            start = None
+    out += samples[pos:hi]
+    after = len(out) / rate
+    if after > F5_MAX_REFERENCE_S:
+        raise ValueError(f"{path.name}: даже со сжатыми паузами {after:.1f} с > {F5_MAX_REFERENCE_S:.0f} с — "
+                         f"нужны короче test_lines")
+    return out, rate, before, after
 
 
 def candidates_page(work_dir, latest_only: bool = True) -> Path:

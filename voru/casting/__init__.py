@@ -43,6 +43,13 @@ class VoiceProfile:
     license: Optional[str] = None
     test_lines: tuple = ()
     design_prompt: Optional[str] = None  # описание для VoiceDesign, если отличается от description
+    # папка записей человека (<квест>-<этап>[-m|-f].wav) внутри <рабочая папка>/recordings: такие
+    # реплики озвучивает преобразование голоса (seed-vc) в тембр референса, а не TTS.
+    # Записи — голос человека, в git не хранятся (как очередь и мастера).
+    recordings: Optional[str] = None
+
+    def recordings_dir(self, recordings_root) -> Optional[Path]:
+        return Path(recordings_root) / self.recordings if self.recordings and recordings_root else None
 
     def params_for(self, provider: str) -> dict:
         return dict(self.params.get(provider, {}))
@@ -102,6 +109,7 @@ def _profile(raw: dict) -> VoiceProfile:
         license=raw.get("license"),
         test_lines=tuple(raw.get("test_lines") or ()),
         design_prompt=raw.get("design_prompt"),
+        recordings=raw.get("recordings"),
     )
 
 

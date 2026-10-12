@@ -245,6 +245,41 @@ def test_f5_trims_chunk_edge_silence_so_pause_is_ours(tmp_path):
     assert [f.reason for f in check_audio(result.path, req.text)] == []
 
 
+def test_f5_rejects_reference_longer_than_it_reads(tmp_path):
+    """Регрессия (приёмка 12.10.2026): референс сатира 13.2 с — F5 обрезал звук до 12 с, а хвост
+    транскрипта («о чём другие только шепчутся») вставлял в каждую реплику."""
+    ref = tmp_path / "long.wav"
+    with wave.open(str(ref), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(24000)
+        w.writeframes(b"\x00\x00" * int(24000 * 12.5))
+    req = SynthesisRequest(text="Привет.", locale="ruRU", player_gender=None,
+                           voice=VoiceRef("v", "1", ref, "Длинный транскрипт."), delivery_profile="neutral",
+                           generation_config={"seed": 1}, output_path=tmp_path / "out.wav")
+
+    with pytest.raises(UnsupportedOption) as err:
+        F5RuV4Provider().validate(req)
+
+    assert err.value.reason == "reference_too_long"
+
+
+def test_repo_references_fit_f5_limit():
+    from voru.casting import load_casting
+    from voru.providers.f5_ru import F5_MAX_REFERENCE_S
+
+    casting = load_casting()
+    too_long = {}
+    for voice_id, profile in casting.voices.items():
+        if profile.reference_audio:
+            with wave.open(str(casting.path.parent / profile.reference_audio)) as w:
+                seconds = w.getnframes() / w.getframerate()
+            if seconds > F5_MAX_REFERENCE_S:
+                too_long[voice_id] = round(seconds, 2)
+
+    assert too_long == {}
+
+
 def test_f5_loads_pinned_checkpoint_vocab_and_vocoder(monkeypatch):
     import sys
     import types

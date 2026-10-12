@@ -10,6 +10,7 @@
 Для настоящих моделей рабочую папку (SQLite-очередь, мастера) держать на диске WSL, не на /mnt/c.
 """
 import argparse
+import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -36,6 +37,8 @@ SMOKE_CORPUS = REPO_ROOT / "corpus" / "smoke" / "shadowglen.jsonl"
 WORK_DIR = REPO_ROOT / "work"
 TAKES = REPO_ROOT / "corpus" / "takes.yaml"
 TAKE_SEED_STEP = 104729  # дубль n слота: seed голоса + n * шаг (не пересекается с шагом QA-повторов)
+# Провайдеры, которые не синтезируют текст, а преобразуют запись человека (recordings в voices.yaml).
+RECORDED_PROVIDERS = {"seed-vc"}
 
 
 def load_takes(path=TAKES) -> dict:
@@ -59,6 +62,8 @@ class Report:
     blocked: dict = field(default_factory=dict)  # text_key → причина
     casting_errors: dict = field(default_factory=dict)  # content_id → причина
     unused_takes: list = field(default_factory=list)  # дубли этой модели, не совпавшие ни с одним слотом
+    recorded: list = field(default_factory=list)  # TTS: реплики, которые озвучены записью человека
+    missing_recordings: list = field(default_factory=list)  # преобразование голоса: записи нет
     stats: dict = field(default_factory=dict)
     files: int = 0
     pack_dir: Optional[Path] = None
@@ -71,6 +76,15 @@ class Planned:
     voice_id: str
     slot: str
     request: SynthesisRequest
+
+
+def recording_name(record, player_gender) -> str:
+    """Имя файла записи человека: <квест>-<этап>[-m|-f] (так их сохраняет стенд записи)."""
+    return f"{record.quest_id}-{record.stage}" + (f"-{player_gender}" if player_gender else "")
+
+
+def file_sha256(path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
 def slot_of(provider_name: str, content_id: str, player_gender) -> str:
@@ -92,10 +106,12 @@ def read_corpora(paths) -> list:
 
 
 def plan(corpus_paths, provider_name: str, report: Report, casting=None, accent: bool = True,
-         takes=TAKES) -> list:
+         takes=TAKES, recordings_root=None) -> list:
     """Реплики к синтезу для провайдера: подготовка текста, кастинг, запрос. Проблемы — в отчёт.
     Ударения берутся из кэша corpus/accents.jsonl (python -m voru.normalize.accent warm).
-    Дубли из corpus/takes.yaml меняют seed только своего слота."""
+    Дубли из corpus/takes.yaml меняют seed только своего слота.
+    recordings_root (обычно <рабочая папка>/recordings): реплики с записью человека уходят
+    провайдерам из RECORDED_PROVIDERS, TTS их пропускает; без recordings_root записи не учитываются."""
     overrides, dictionary = load_overrides(), load_dictionary()
     take_of = load_takes(takes) if takes else {}
     accentuator = Accentuator() if accent else None
@@ -112,15 +128,29 @@ def plan(corpus_paths, provider_name: str, report: Report, casting=None, accent:
             report.casting_errors[record.content_id] = err.reason
             continue
         profile = casting.voices[decision.voice_id]
+        rec_dir = profile.recordings_dir(recordings_root)
         for variant in prepared:
             slot = slot_of(provider_name, record.content_id, variant.player_gender)
             seed = profile.seed + take_of.get(slot, 0) * TAKE_SEED_STEP
+            config = {"seed": seed, **profile.params_for(provider_name)}
+            recording = rec_dir / f"{recording_name(record, variant.player_gender)}.wav" if rec_dir else None
+            if provider_name in RECORDED_PROVIDERS:
+                if recording is None:
+                    continue  # голос без записей — его озвучивает TTS
+                if not recording.exists():
+                    report.missing_recordings.append(recording.stem)
+                    continue
+                config.update(source_audio=str(recording), source_sha256=file_sha256(recording))
+            elif recording is not None and recording.exists():
+                report.recorded.append(f"{record.content_id}|{variant.player_gender or '-'}")
+                continue
             request = SynthesisRequest(
                 text=variant.spoken_text, locale=record.locale, player_gender=variant.player_gender,
                 voice=profile.voice_ref(casting.path.parent), delivery_profile="neutral",
-                generation_config={"seed": seed, **profile.params_for(provider_name)}, output_path=None,
+                generation_config=config, output_path=None,
             )
             planned.append(Planned(record, variant, decision.voice_id, slot, request))
+    report.missing_recordings.sort()
     used = {p.slot for p in planned}
     report.unused_takes = sorted(s for s in take_of if s.startswith(f"{provider_name}:") and s not in used)
     return planned
@@ -135,32 +165,46 @@ def build_pilot(corpus_paths, provider_name: str, work_dir=WORK_DIR, out_dir=Non
     queue = JobQueue(work_dir / "jobs.sqlite")
     report = Report()
 
-    planned = plan(corpus_paths, provider.name, report, casting, accent)
+    planned = plan(corpus_paths, provider.name, report, casting, accent, recordings_root=work_dir / "recordings")
     for item in planned:
         enqueue_synthesis(queue, item.slot, provider, item.request, NORMALIZATION_REVISION)
     report.stats = run_worker(queue, provider, "pilot", work_dir / "masters")
     if not pack:
         return report
+    packed = assemble_pack(corpus_paths, [provider.name], work_dir, out_dir, version, allow_unreviewed, accent)
+    report.files, report.pack_dir = packed.files, packed.pack_dir
+    return report
 
+
+def assemble_pack(corpus_paths, provider_names, work_dir=WORK_DIR, out_dir=None, version="0.1.0-pilot",
+                  allow_unreviewed: bool = False, accent: bool = True) -> Report:
+    """Пак из готовых реплик нескольких провайдеров (TTS + записи человека) — без загрузки моделей.
+    Каждая реплика берётся у того провайдера, кому её отдал plan()."""
+    work_dir = Path(work_dir)
+    out_dir = Path(out_dir) if out_dir else work_dir / "packs"
+    casting = load_casting()
+    queue = JobQueue(work_dir / "jobs.sqlite")
+    report = Report()
     entries = []
-    for item in planned:
-        jobs = queue.jobs_for_slot(item.slot)
-        job = queue.accepted(item.slot) or (
-            next((j for j in reversed(jobs) if j.state == "generated"), None) if allow_unreviewed else None)
-        if job is None:
-            continue
-        record = item.record
-        entries.append(PackEntry(
-            content_id=record.content_id, text_key=record.text_key,
-            file_key=file_key(addon_key(record), item.variant.player_gender), quest_id=record.quest_id,
-            stage=record.stage, npc_type=record.npc_type, npc_id=record.npc_id, npc_name=record.npc_name,
-            voice_id=item.voice_id, fingerprint=job.fingerprint, master_path=Path(job.result["output_path"]),
-        ))
+    for name in provider_names:
+        for item in plan(corpus_paths, name, report, casting, accent, recordings_root=work_dir / "recordings"):
+            jobs = queue.jobs_for_slot(item.slot)
+            job = queue.accepted(item.slot) or (
+                next((j for j in reversed(jobs) if j.state == "generated"), None) if allow_unreviewed else None)
+            if job is None:
+                continue
+            record = item.record
+            entries.append(PackEntry(
+                content_id=record.content_id, text_key=record.text_key,
+                file_key=file_key(addon_key(record), item.variant.player_gender), quest_id=record.quest_id,
+                stage=record.stage, npc_type=record.npc_type, npc_id=record.npc_id, npc_name=record.npc_name,
+                voice_id=item.voice_id, fingerprint=job.fingerprint, master_path=Path(job.result["output_path"]),
+            ))
     if not entries:
         return report
 
     credits = {
-        voice_id: {"provenance": p.provenance or f"нет референса ({provider.name})",
+        voice_id: {"provenance": p.provenance or f"нет референса ({', '.join(provider_names)})",
                    "license": p.license or "не указана"}
         for voice_id, p in casting.voices.items()
     }
@@ -181,18 +225,29 @@ def main(argv=None):
     parser.add_argument("--version", default="0.1.0-pilot")
     parser.add_argument("--allow-unreviewed", action="store_true")
     parser.add_argument("--no-pack", action="store_true", help="только синтез, без сборки пака")
+    parser.add_argument("--pack-only", nargs="+", metavar="PROVIDER",
+                        help="без синтеза: пак из готовых реплик этих провайдеров (например f5-tts-ru-v4 seed-vc)")
     args = parser.parse_args(argv)
+    corpora = args.corpus or [PILOT_CORPUS, SMOKE_CORPUS]
 
-    report = build_pilot(args.corpus or [PILOT_CORPUS, SMOKE_CORPUS], args.provider, work_dir=args.work_dir,
-                         out_dir=args.out_dir, version=args.version, allow_unreviewed=args.allow_unreviewed,
-                         pack=not args.no_pack)
-    print(f"синтез: {report.stats}")
+    if args.pack_only:
+        report = assemble_pack(corpora, args.pack_only, work_dir=args.work_dir, out_dir=args.out_dir,
+                               version=args.version, allow_unreviewed=args.allow_unreviewed)
+    else:
+        report = build_pilot(corpora, args.provider, work_dir=args.work_dir,
+                             out_dir=args.out_dir, version=args.version, allow_unreviewed=args.allow_unreviewed,
+                             pack=not args.no_pack)
+        print(f"синтез: {report.stats}")
     for key, reason in sorted(report.blocked.items()):
         print(f"  заблокировано {key}: {reason}")
     for key, reason in sorted(report.casting_errors.items()):
         print(f"  нет голоса {key}: {reason}")
     for slot in report.unused_takes:
         print(f"  дубль не применён (нет такого слота): {slot}")
+    for name in report.missing_recordings:
+        print(f"  нет записи (озвучит TTS): {name}")
+    if report.recorded:
+        print(f"  озвучено записями человека: {len(report.recorded)}")
     print(f"файлов в паке: {report.files} → {report.pack_dir or 'пак не собран'}")
 
 

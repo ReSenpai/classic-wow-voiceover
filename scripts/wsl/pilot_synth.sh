@@ -9,6 +9,10 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 PY="$HOME/voru-envs/$ENV_NAME/bin/python"
 export HF_HUB_DISABLE_XET="${HF_HUB_DISABLE_XET:-1}"
 cd "$REPO"
+# Записи человека (стенд пишет в work/recordings репозитория) → рабочая папка запуска.
+if [ -d work/recordings ]; then
+  mkdir -p "$HOME/voru-work/recordings" && cp -r work/recordings/. "$HOME/voru-work/recordings/"
+fi
 for provider in "$@"; do
   echo "== $provider $(date -Is)" | tee -a "work/pilot_$ENV_NAME.log"
   "$PY" -m voru.pipeline --provider "$provider" --corpus corpus/pilot/teldrassil.jsonl \

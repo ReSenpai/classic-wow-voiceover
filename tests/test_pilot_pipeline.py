@@ -162,6 +162,110 @@ def test_repo_takes_file_is_valid():
     assert isinstance(load_takes(TAKES), dict)
 
 
+# --- реплики, записанные человеком (преобразование голоса) ---
+
+class MockVc(MockProvider):
+    """Как seed-vc: принимает запись в generation_config."""
+    name = "mock-vc"
+    default_capabilities = dataclasses.replace(
+        MockProvider.default_capabilities,
+        config_keys=MockProvider.default_capabilities.config_keys | {"source_audio", "source_sha256"})
+
+
+@pytest.fixture
+def recorded(tmp_path, monkeypatch):
+    """Сатир (2150) записан человеком: 488-complete есть, 488-accept-m/f — нет.
+    Записи лежат в <рабочая папка>/recordings/satyr-male, как у настоящего запуска."""
+    import voru.pipeline
+    import voru.providers
+    from voru.casting import load_casting
+
+    monkeypatch.setitem(voru.providers._REGISTRY, "mock-vc", f"{__name__}:MockVc")
+    monkeypatch.setattr(voru.pipeline, "RECORDED_PROVIDERS", {"seed-vc", "mock-vc"})
+    rec = tmp_path / "work" / "recordings" / "satyr-male"
+    rec.parent.mkdir(parents=True)
+    rec.mkdir()
+    import wave
+    with wave.open(str(rec / "488-complete.wav"), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(24000)
+        w.writeframes(b"\x00\x20" * 24000)
+    casting = load_casting()
+    satyr = dataclasses.replace(casting.voices["satyr-male"], recordings="satyr-male")
+    return dataclasses.replace(casting, voices={**casting.voices, "satyr-male": satyr}), rec
+
+
+def test_recordings_are_ignored_without_recordings_root(subset, recorded):
+    from voru.pipeline import Report, plan
+
+    casting, _ = recorded
+
+    assert len(plan(subset, "mock", Report(), casting)) == 5
+    assert plan(subset, "mock-vc", Report(), casting) == []
+
+
+def test_recorded_lines_go_to_voice_conversion(subset, recorded):
+    import hashlib
+
+    from voru.pipeline import Report, plan
+
+    casting, rec = recorded
+    report = Report()
+
+    items = plan(subset, "mock-vc", report, casting, recordings_root=rec.parent)
+
+    assert [i.slot for i in items] == ["mock-vc:quest:488:complete:creature:2150|-"]
+    config = items[0].request.generation_config
+    assert config["source_audio"] == str(rec / "488-complete.wav")
+    assert config["source_sha256"] == hashlib.sha256((rec / "488-complete.wav").read_bytes()).hexdigest()
+    assert report.missing_recordings == []  # в subset у сатира только 488-complete
+
+
+def test_tts_skips_recorded_lines_but_keeps_the_rest(subset, recorded):
+    from voru.pipeline import Report, plan
+
+    casting, rec = recorded
+    report = Report()
+
+    slots = [i.slot for i in plan(subset, "mock", report, casting, recordings_root=rec.parent)]
+
+    assert "mock:quest:488:complete:creature:2150|-" not in slots
+    assert len(slots) == 4
+    assert report.recorded == ["quest:488:complete:creature:2150|-"]
+
+
+def test_voice_with_recordings_reports_missing_ones(subset, recorded, tmp_path):
+    from voru.corpus.record import read_jsonl, write_jsonl
+    from voru.pipeline import PILOT_CORPUS, Report, plan
+
+    casting, rec = recorded
+    satyr_lines = [r for r in read_jsonl(PILOT_CORPUS) if r.npc_id == 2150]
+    path = tmp_path / "satyr.jsonl"
+    write_jsonl(satyr_lines, path)
+    report = Report()
+
+    plan(path, "mock-vc", report, casting, recordings_root=rec.parent)
+
+    assert report.missing_recordings == ["488-accept-f", "488-accept-m", "489-complete"]
+
+
+def test_pack_combines_tts_and_recorded_lines(subset, recorded, tmp_path, monkeypatch):
+    import voru.pipeline
+
+    casting, _ = recorded
+    monkeypatch.setattr(voru.pipeline, "load_casting", lambda: casting)
+    for name in ("mock", "mock-vc"):
+        run(subset, tmp_path, provider_name=name, pack=False)
+
+    report = voru.pipeline.assemble_pack([subset], ["mock", "mock-vc"], work_dir=tmp_path / "work",
+                                         out_dir=tmp_path / "packs", version="0.0.1-test", allow_unreviewed=True)
+
+    assert report.files == 5
+    manifest = json.loads((tmp_path / "packs" / MODULE_NAME / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["coverage"]["files"] == 5
+
+
 def test_synthesis_without_pack(subset, tmp_path):
     report = run(subset, tmp_path, pack=False, allow_unreviewed=True)
 

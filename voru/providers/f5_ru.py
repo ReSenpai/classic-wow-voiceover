@@ -7,7 +7,7 @@
 import wave
 
 from voru.normalize.chunking import chunk_text
-from voru.providers.base import Capabilities, Provider
+from voru.providers.base import Capabilities, Provider, UnsupportedOption
 
 F5_REPO = "Misha24-10/F5-TTS_RUSSIAN"
 F5_REVISION = "ea166adeae4c80ec5ee423a671e2bdb83906cf84"
@@ -21,11 +21,18 @@ VOCOS_REVISION = "0feb3fdd929bcd6649e0e7c5a688cf7dd012ef21"
 EDGE_KEEP_S = 0.05  # оставляем у краёв куска: не срезать согласные и дыхание
 EDGE_SILENCE_LEVEL = 0.01  # ≈ -40 dBFS
 F5_MAX_SECONDS = 22  # F5 рассчитывает лимит куска как байты/с референса × (22 − длина референса)
+# F5 обрезает референс до 12 с, а транскрипт оставляет целым — хвост текста без звука модель
+# вставляет в каждую реплику. Поэтому длиннее не принимаем.
+F5_MAX_REFERENCE_S = 12.0
+
+
+def _reference_seconds(reference_audio) -> float:
+    with wave.open(str(reference_audio)) as w:
+        return w.getnframes() / w.getframerate()
 
 
 def chunk_limit_bytes(reference_audio, reference_text: str) -> int:
-    with wave.open(str(reference_audio)) as w:
-        ref_seconds = min(w.getnframes() / w.getframerate(), 12.0)  # F5 обрезает референс до 12 с
+    ref_seconds = min(_reference_seconds(reference_audio), F5_MAX_REFERENCE_S)
     return int(len(reference_text.encode("utf-8")) / ref_seconds * (F5_MAX_SECONDS - ref_seconds))
 
 
@@ -58,6 +65,13 @@ class _F5RuProvider(Provider):
 
     def model_revision(self) -> str:
         return f"{F5_REPO}@{F5_REVISION}:{self.checkpoint}+{VOCOS_REPO}@{VOCOS_REVISION[:12]}"
+
+    def validate(self, request):
+        super().validate(request)
+        seconds = _reference_seconds(request.voice.reference_audio)
+        if seconds > F5_MAX_REFERENCE_S:
+            raise UnsupportedOption("reference_too_long",
+                                    f"{request.voice.voice_id}: {seconds:.1f} с > {F5_MAX_REFERENCE_S:.0f} с")
 
     def _load(self):
         import imageio_ffmpeg

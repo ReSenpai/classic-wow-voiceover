@@ -7,6 +7,7 @@ _REGISTRY = {
     "qwen3-tts-ru-stress": "voru.providers.qwen3:Qwen3StressProvider",
     "f5-tts-ru-v2": "voru.providers.f5_ru:F5RuV2Provider",
     "f5-tts-ru-v4": "voru.providers.f5_ru:F5RuV4Provider",
+    "seed-vc": "voru.providers.seed_vc:SeedVcProvider",
 }
 
 

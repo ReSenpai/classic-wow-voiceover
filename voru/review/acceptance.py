@@ -26,7 +26,8 @@ def build_acceptance_page(corpus_paths, provider_name: str, work_dir, out_dir, i
     queue = JobQueue(Path(work_dir) / "jobs.sqlite")
     out = Path(out_dir)
     items, cards = {}, []
-    for planned in sorted(plan(corpus_paths, provider_name, Report()), key=lambda p: p.slot):
+    planned_items = plan(corpus_paths, provider_name, Report(), recordings_root=Path(work_dir) / "recordings")
+    for planned in sorted(planned_items, key=lambda p: p.slot):
         job = _listenable_job(queue, planned.slot)
         if job is None or (job.state == "accepted" and not include_accepted):
             continue
