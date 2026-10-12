@@ -39,6 +39,24 @@ def test_entry_applied_once_not_twice():
     assert apply_dictionary("еще", d) == "ещё"
 
 
+@pytest.mark.parametrize("text, expected", [
+    ("Его прервал Т+енарон.", "Его прервал Тен+арон."),         # имя: словарь сильнее RUAccent
+    ("Тельдрасс+ил ждёт.", "Тельдр+ассил ждёт."),
+    ("М+ежду нами.", "Межд+у нами."),                            # исправление поверх RUAccent
+    ("Между нами.", "Межд+у нами."),                              # RUAccent не поставил ударение
+])
+def test_dictionary_overrides_existing_stress_marks(text, expected):
+    d = entries(("Тенарон", "Тен+арон"), ("Тельдрассил", "Тельдр+ассил"), ("между", "межд+у"))
+
+    assert apply_dictionary(text, d) == expected
+
+
+def test_dictionary_matches_yo_and_e_equally():
+    d = entries(("еще", "ещ+ё"))
+
+    assert apply_dictionary("Ещ+ё раз, ещё раз, еще раз.", d) == "Ещ+ё раз, ещ+ё раз, ещ+ё раз."
+
+
 @pytest.mark.parametrize("text, stress, expected", [
     ("Тельдр+ассил, ещё.", True, "Тельдр+ассил, ещё."),
     ("Тельдр+ассил, ещё.", False, "Тельдрассил, ещё."),

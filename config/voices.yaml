@@ -37,7 +37,11 @@ voices:
       - Старые корни болят, когда в землю приходит зло.
 
   - voice_id: nightelf-female-calm
-    revision: "1"
+    revision: "2"
+    reference_audio: "voice_refs/nightelf-female-calm.wav"
+    reference_text: "Будь осторожен в лесу, не все его обитатели дружелюбны. Я буду ждать тебя здесь, у ручья."
+    provenance: "Qwen3-TTS VoiceDesign Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign@5ecdb67327fd37bb2e042aab12ff7391903235d3, seed 1745601059 (батч 1745601057, №3 из 6), 2026-10-11; описание: Adult female night elf, warm and composed alto voice, gentle, calm pace."
+    license: "Apache-2.0 (модель Qwen3-TTS); голос сгенерирован проектом"
     sex: female
     description: Взрослая ночная эльфийка, тёплая, сдержанная; базовый женский голос расы.
     design_prompt: Adult female night elf, warm and composed alto voice, gentle, calm pace.
@@ -59,7 +63,11 @@ voices:
       - Действуй быстро и не теряй бдительности.
 
   - voice_id: nightelf-female-priestess
-    revision: "1"
+    revision: "2"
+    reference_audio: "voice_refs/nightelf-female-priestess.wav"
+    reference_text: "Свет луны укажет тебе дорогу даже в самой тёмной ночи. Не бойся, ты не один в этом пути."
+    provenance: "Qwen3-TTS VoiceDesign Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign@5ecdb67327fd37bb2e042aab12ff7391903235d3, seed 918256441 (батч 918256436, №6 из 6), 2026-10-11; описание: Female moon priestess, serene and luminous, melodic soprano, solemn without being theatrical."
+    license: "Apache-2.0 (модель Qwen3-TTS); голос сгенерирован проектом"
     sex: female
     description: Жрица Луны, спокойная, светлая, мелодичная, торжественная без пафоса.
     design_prompt: Female moon priestess, serene and luminous, melodic soprano, solemn without being theatrical.
@@ -81,7 +89,11 @@ voices:
       - Кто бы мог подумать, что ты так легко согласишься помочь.
 
   - voice_id: dryad-female
-    revision: "1"
+    revision: "2"
+    reference_audio: "voice_refs/dryad-female.wav"
+    reference_text: "Я вижу, тебе удалось найти меня! Лес шепчет о тебе с самого утра."
+    provenance: "Qwen3-TTS VoiceDesign Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign@5ecdb67327fd37bb2e042aab12ff7391903235d3, seed 995643176 (батч 995643174, №3 из 8), 2026-10-11; описание: Woman in her mid-twenties, full of energy and confidence, clear resonant voice in a comfortable lower-middle register, energetic delivery with a smile, adult and grown-up, definitely not a child or teenager."
+    license: "Apache-2.0 (модель Qwen3-TTS); голос сгенерирован проектом"
     sex: female
     description: Дриада — молодая девушка, полная энергии; звонкий, живой, уверенный голос, не детский.
     design_prompt: Woman in her mid-twenties, full of energy and confidence, clear resonant voice in a comfortable lower-middle register, energetic delivery with a smile, adult and grown-up, definitely not a child or teenager.

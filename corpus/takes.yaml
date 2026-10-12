@@ -1,0 +1,31 @@
+# Дубли реплик по итогам прослушивания: брак модели, который не лечится текстом
+# (обрыв слова, пропуск, ударение мимо знака). Дубль n = seed голоса + n * TAKE_SEED_STEP
+# только для этого слота; остальные реплики не пересинтезируются.
+#
+# - slot: <провайдер>:<content_id>|<пол игрока m/f или ->
+#   take: <номер дубля, с 1; следующий брак — увеличить>
+#   reason: <что услышали, откуда>
+- slot: f5-tts-ru-v4:quest:940:complete:creature:3516|f
+  take: 1
+  reason: A/B 12.10.2026 — обрыв на «Бо+юсь», пауза, продолжение с «мне никогда»
+- slot: f5-tts-ru-v4:quest:940:complete:creature:3516|m
+  take: 1
+  reason: A/B 12.10.2026 — тот же обрыв на «Бо+юсь»
+- slot: f5-tts-ru-v4:quest:918:complete:creature:2080|m
+  take: 1
+  reason: A/B 12.10.2026 — пропущено «Сл+авно!», в конце слишком высокий тон
+- slot: f5-tts-ru-v4:quest:918:accept:creature:2080|f
+  take: 1
+  reason: A/B 12.10.2026 — «дух+и» прочитано как «д+ухи»
+- slot: f5-tts-ru-v4:quest:922:complete:creature:3517|-
+  take: 1
+  reason: A/B 12.10.2026 — нет паузы после «А,»
+- slot: f5-tts-ru-v4:quest:923:accept:creature:3517|-
+  take: 1
+  reason: A/B 12.10.2026 — «Их надо уничтожить!» выкрикнуто другим тоном
+- slot: f5-tts-ru-v4:quest:929:accept:creature:3515|-
+  take: 1
+  reason: A/B 12.10.2026 — «вод+ы» прочитано как «в+оды», «Тенарон...» на высокой ноте
+- slot: f5-tts-ru-v4:quest:935:complete:creature:3516|-
+  take: 1
+  reason: A/B 12.10.2026 — «ярм+а» прочитано как «+ярма»

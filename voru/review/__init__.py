@@ -5,6 +5,7 @@ build_ab_report() кладёт в папку index.html, audio/ (имена не
 и выгружаются кнопкой в ratings.json; score() раскрывает ключ и считает метрики:
 доля побед без ничьих (порог пилота 75%), число оценок, медианы естественности и роли.
 
+  python -m voru.review build --a f5-tts-ru-v2 --b f5-tts-ru-v4 --work-dir ~/voru-work --out work/review/f5 --limit 10
   python -m voru.review score --key work/review/<имя>/key.json --ratings ratings.json
 """
 import argparse
@@ -195,14 +196,73 @@ def score(key: dict, ratings: dict) -> dict:
     return summary
 
 
+_LISTENABLE = ("accepted", "review_required", "generated")
+
+
+def _listenable_job(queue, slot):
+    jobs = [j for j in queue.jobs_for_slot(slot) if j.state in _LISTENABLE]
+    return jobs[-1] if jobs else None
+
+
+def build_pilot_ab(corpus_paths, provider_a: str, provider_b: str, work_dir, out_dir, seed: int,
+                   limit=None) -> Path:
+    """Слепое сравнение двух моделей на корпусе по уже синтезированным мастерам из очереди.
+    Брак (qa_failed) не предлагается к прослушиванию, сомнительное (review_required) — с флагом."""
+    from voru.casting import load_casting
+    from voru.jobs.queue import JobQueue
+    from voru.pipeline import Report, plan
+
+    queue = JobQueue(Path(work_dir) / "jobs.sqlite")
+    casting = load_casting()
+    sides = {name: {(p.record.content_id, p.variant.player_gender): p
+                    for p in plan(corpus_paths, name, Report(), casting)} for name in (provider_a, provider_b)}
+    items = []
+    for key, planned in sorted(sides[provider_a].items(), key=lambda kv: (kv[0][0], kv[0][1] or "")):
+        other = sides[provider_b].get(key)
+        jobs = {provider_a: _listenable_job(queue, planned.slot),
+                provider_b: other and _listenable_job(queue, other.slot)}
+        if not all(jobs.values()):
+            continue
+        record = planned.record
+        items.append(ReviewItem(
+            item_id=f"{record.content_id}|{planned.variant.player_gender or '-'}",
+            title=f"{record.quest_title or record.quest_id} · {record.stage}",
+            npc_name=record.npc_name or "",
+            raw_text=record.raw_text,
+            spoken_text=planned.variant.spoken_text,
+            candidates={name: Path(job.result["output_path"]) for name, job in jobs.items()},
+            flags={name: [job.last_error] for name, job in jobs.items() if job.state == "review_required"},
+        ))
+    if not items:
+        raise ValueError(f"нет пар для сравнения {provider_a} / {provider_b}: сначала синтез обеими моделями")
+    if limit and len(items) > limit:
+        items = sorted(random.Random(seed).sample(items, limit), key=lambda i: i.item_id)
+    return build_ab_report(items, out_dir, seed)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
+    bd = sub.add_parser("build")
+    bd.add_argument("--a", required=True)
+    bd.add_argument("--b", required=True)
+    bd.add_argument("--work-dir", type=Path, required=True)
+    bd.add_argument("--out", type=Path, required=True)
+    bd.add_argument("--corpus", type=Path, action="append")
+    bd.add_argument("--limit", type=int)
+    bd.add_argument("--seed", type=int, default=1)
     sc = sub.add_parser("score")
     sc.add_argument("--key", type=Path, required=True)
     sc.add_argument("--ratings", type=Path, required=True)
     args = parser.parse_args(argv)
 
+    if args.command == "build":
+        from voru.pipeline import PILOT_CORPUS
+
+        out = build_pilot_ab(args.corpus or [PILOT_CORPUS], args.a, args.b, args.work_dir, args.out,
+                             args.seed, args.limit)
+        print(f"отчёт: {out / 'index.html'} (ключ: {out / 'key.json'} — не открывать до конца прослушивания)")
+        return
     key = json.loads(args.key.read_text(encoding="utf-8"))
     summary = score(key, json.loads(args.ratings.read_text(encoding="utf-8")))
     for system, s in summary.items():

@@ -174,6 +174,59 @@ def test_clean_mock_audio_passes_qa(queue, masters):
     assert stats == {"generated": 1, "failed": 0, "retried": 0, "qa_failed": 0, "review_required": 0}
 
 
+class SilentOnBaseSeed(MockProvider):
+    """Брак только на базовом seed — как неудачный дубль модели."""
+    def _generate(self, model_text, request):
+        samples, sr = super()._generate(model_text, request)
+        return ([0.0] * len(samples) if request.generation_config["seed"] == 1 else samples), sr
+
+
+def test_qa_failure_is_retried_with_another_seed(queue, masters):
+    from voru.jobs.runner import QA_SEED_STEP
+
+    job_id = enqueue_synthesis(queue, "slot-a", SilentOnBaseSeed(),
+                               req(text="Привет, путник, как твои дела сегодня?"), 1)
+
+    stats = run_worker(queue, SilentOnBaseSeed(), "w1", masters)
+
+    job = queue.get(job_id)
+    assert job.state == "generated"
+    assert job.result["seed_used"] == 1 + QA_SEED_STEP
+    assert job.result["qa_attempts"] == 2
+    assert "silent" in job.result["qa_history"][0]
+    assert stats["generated"] == 1 and stats["qa_failed"] == 0
+
+
+def test_qa_retries_are_limited(queue, masters):
+    from voru.jobs.runner import MAX_QA_RETRIES
+
+    job_id = enqueue_synthesis(queue, "slot-a", Silent(), req(text="Привет, путник, как твои дела сегодня?"), 1)
+
+    run_worker(queue, Silent(), "w1", masters)
+
+    job = queue.get(job_id)
+    assert job.state == "qa_failed"
+    assert job.result["qa_attempts"] == 1 + MAX_QA_RETRIES
+    assert len(job.result["qa_history"]) == 1 + MAX_QA_RETRIES
+
+
+def test_clean_first_attempt_records_base_seed(queue, masters):
+    job_id = enqueue_synthesis(queue, "slot-a", MockProvider(), req(text="Привет, путник, как твои дела сегодня?"), 1)
+
+    run_worker(queue, MockProvider(), "w1", masters)
+
+    result = queue.get(job_id).result
+    assert (result["seed_used"], result["qa_attempts"], result["qa_history"]) == (1, 1, [])
+
+
+def test_transient_error_is_kept_after_success(queue, masters):
+    job_id = enqueue_synthesis(queue, "slot-a", MockProvider(), req(), 1)
+
+    run_worker(queue, Flaky(failures=1), "w1", masters)
+
+    assert "CUDA out of memory" in queue.get(job_id).last_error
+
+
 def test_text_changed_during_synthesis_does_not_break_qa(queue, masters):
     class ChangesTextMidway(Silent):
         def _generate(self, model_text, request):

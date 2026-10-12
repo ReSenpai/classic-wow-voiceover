@@ -32,7 +32,8 @@ def _candidate_dir(work_dir, voice_id) -> Path:
     return Path(work_dir) / DESIGN_DIR / voice_id
 
 
-def design_candidates(casting, voice_id: str, designer, work_dir, count: int = 3, batch_size: int = 8) -> list:
+def design_candidates(casting, voice_id: str, designer, work_dir, count: int = 3, batch_size: int = 8,
+                      session: str = "") -> list:
     """Кандидаты считаются батчами: генерация упирается в накладные расходы Python на каждый шаг,
     а не в GPU, поэтому N вариантов за один проход почти не дороже одного.
     Номер кандидата seed-N — для имени и pick; случайность общая на батч (batch_seed)."""
@@ -52,7 +53,7 @@ def design_candidates(casting, voice_id: str, designer, work_dir, count: int = 3
             path = _candidate_dir(work_dir, voice_id) / f"seed-{seed}.wav"
             write_wav_atomically(path, samples, sample_rate)
             meta = {"text": text, "instruct": instruct, "seed": seed,
-                    "batch_seed": batch_seed, "batch_index": index, "batch_size": size}
+                    "batch_seed": batch_seed, "batch_index": index, "batch_size": size, "session": session}
             path.with_suffix(".json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
             paths.append(path)
     return paths
@@ -119,19 +120,24 @@ def pick_candidate(voices_path, voice_id: str, work_dir, seed: int, designer_rev
 F5_MAX_REFERENCE_S = 12.0  # F5 обрезает референс — транскрипт перестаёт совпадать со звуком
 
 
-def candidates_page(work_dir) -> Path:
-    """index.html со всеми кандидатами: плееры, текст, флаги QA и готовая команда pick."""
+def candidates_page(work_dir, latest_only: bool = True) -> Path:
+    """index.html с кандидатами: плееры, текст, флаги QA и готовая команда pick.
+    По умолчанию — только последняя сессия generate (старые файлы остаются на диске)."""
     import html
     import wave
 
     from voru.qa.audio import check_audio
 
     root = Path(work_dir) / DESIGN_DIR
+    metas = {w: json.loads(w.with_suffix(".json").read_text(encoding="utf-8")) for w in root.glob("*/seed-*.wav")}
+    latest = max((m.get("session", "") for m in metas.values()), default="")
     sections = []
     for voice_dir in sorted(p for p in root.iterdir() if p.is_dir()):
         rows = []
         for wav_path in sorted(voice_dir.glob("seed-*.wav")):
-            meta = json.loads(wav_path.with_suffix(".json").read_text(encoding="utf-8"))
+            meta = metas[wav_path]
+            if latest_only and meta.get("session", "") != latest:
+                continue
             with wave.open(str(wav_path)) as w:
                 seconds = w.getnframes() / w.getframerate()
             notes = [f"{f.reason}: {f.detail}" for f in check_audio(wav_path, meta["text"])]
@@ -145,6 +151,8 @@ def candidates_page(work_dir) -> Path:
                 f'<p class="prompt">{html.escape(meta["instruct"])}</p>'
                 + "".join(f'<p class="warn">{html.escape(n)}</p>' for n in notes) + "</div>")
         text = json.loads(next(voice_dir.glob("seed-*.json")).read_text(encoding="utf-8")) if rows else {}
+        if not rows:
+            continue
         sections.append(f"<section><h2>{html.escape(voice_dir.name)}</h2>"
                         f"<p><i>{html.escape(text.get('text', ''))}</i></p>"
                         f"{''.join(rows)}</section>")
@@ -184,9 +192,11 @@ def main(argv=None):
         casting = load_casting()
         voices = list(casting.voices) if args.all else args.voice
         designer = QwenVoiceDesigner()
+        session = datetime.datetime.now().isoformat(timespec="seconds")  # страница покажет только эту сессию
         for voice_id in voices:
             started = time.perf_counter()
-            paths = design_candidates(casting, voice_id, designer, args.work_dir, args.count, args.batch_size)
+            paths = design_candidates(casting, voice_id, designer, args.work_dir, args.count, args.batch_size,
+                                      session=session)
             elapsed = time.perf_counter() - started
             audio = sum(wave.open(str(p)).getnframes() / wave.open(str(p)).getframerate() for p in paths)
             print(f"{voice_id}: {len(paths)} шт., звук {audio:.0f} с за {elapsed:.0f} с, RTF {elapsed / audio:.2f}")

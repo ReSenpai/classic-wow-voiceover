@@ -7,6 +7,7 @@ import pytest
 from voru.config import REPO_ROOT
 from voru.corpus.record import read_jsonl, write_jsonl
 from voru.pipeline import MODULE_NAME, build_pilot
+from voru.providers.mock import MockProvider
 
 PILOT = REPO_ROOT / "corpus" / "pilot" / "teldrassil.jsonl"
 
@@ -21,8 +22,8 @@ def subset(tmp_path):
     return path
 
 
-def run(corpus, tmp_path, **kwargs):
-    return build_pilot(corpus, provider_name="mock", work_dir=tmp_path / "work",
+def run(corpus, tmp_path, provider_name="mock", **kwargs):
+    return build_pilot(corpus, provider_name=provider_name, work_dir=tmp_path / "work",
                        out_dir=tmp_path / "packs", version="0.0.1-test", **kwargs)
 
 
@@ -61,7 +62,7 @@ def test_blocked_and_uncast_lines_are_reported_not_dropped_silently(subset, tmp_
     path = tmp_path / "corpus2.jsonl"
     write_jsonl([*records, unknown, broken], path)
 
-    report = run(path, tmp_path, allow_unreviewed=True)
+    report = run(path, tmp_path, allow_unreviewed=True, accent=False)  # синтетические тексты не в кэше
 
     assert report.casting_errors == {"quest:1:accept:creature:99999": "no_voice"}
     assert report.blocked == {"quest:2:accept": "needs_override"}
@@ -85,3 +86,85 @@ def test_unreviewed_audio_is_not_exported_by_default(subset, tmp_path):
     assert report.files == 0
     assert report.pack_dir is None
     assert not (tmp_path / "packs" / MODULE_NAME).exists()
+
+
+class MockB(MockProvider):
+    name = "mock-b"
+
+
+@pytest.fixture
+def two_providers(monkeypatch):
+    import voru.providers
+
+    monkeypatch.setitem(voru.providers._REGISTRY, "mock-b", f"{__name__}:MockB")
+
+
+def test_two_providers_do_not_supersede_each_other(subset, tmp_path, two_providers):
+    from voru.jobs.queue import JobQueue
+
+    run(subset, tmp_path, pack=False)
+    report = run(subset, tmp_path, pack=False, provider_name="mock-b")
+
+    assert report.stats["generated"] == 5
+    assert JobQueue(tmp_path / "work" / "jobs.sqlite").summary() == {"generated": 10}
+
+
+def test_take_reseeds_only_listed_slot(subset, tmp_path):
+    """Брак модели, найденный на слух (обрыв слова, пропуск), лечится новым дублем одного слота."""
+    from voru.pipeline import TAKE_SEED_STEP, Report, plan
+
+    takes = tmp_path / "takes.yaml"
+    takes.write_text("- slot: mock:quest:489:accept:creature:2083|f\n  take: 2\n  reason: обрыв слова\n",
+                     encoding="utf-8")
+
+    before = {p.slot: p.request.generation_config["seed"] for p in plan(subset, "mock", Report())}
+    after = {p.slot: p.request.generation_config["seed"] for p in plan(subset, "mock", Report(), takes=takes)}
+
+    changed = {slot for slot in before if before[slot] != after[slot]}
+    assert changed == {"mock:quest:489:accept:creature:2083|f"}
+    assert after["mock:quest:489:accept:creature:2083|f"] == before["mock:quest:489:accept:creature:2083|f"] \
+        + 2 * TAKE_SEED_STEP
+
+
+def test_unused_takes_of_this_provider_are_reported(subset, tmp_path):
+    """Опечатка в слоте не должна молча ничего не делать; дубли других моделей не мешают."""
+    from voru.pipeline import Report, plan
+
+    takes = tmp_path / "takes.yaml"
+    takes.write_text("- slot: mock:quest:1:accept:creature:1|-\n  take: 1\n  reason: опечатка\n"
+                     "- slot: other:quest:489:accept:creature:2083|f\n  take: 1\n  reason: другая модель\n",
+                     encoding="utf-8")
+    report = Report()
+
+    plan(subset, "mock", report, takes=takes)
+
+    assert report.unused_takes == ["mock:quest:1:accept:creature:1|-"]
+
+
+@pytest.mark.parametrize("body", [
+    "- slot: mock:q|f\n  take: 0\n  reason: x\n",
+    "- slot: mock:q|f\n  take: 1\n",
+    "- slot: mock:q|f\n  take: 1\n  reason: x\n- slot: mock:q|f\n  take: 2\n  reason: y\n",
+])
+def test_invalid_takes_rejected(tmp_path, body):
+    from voru.pipeline import load_takes
+
+    path = tmp_path / "takes.yaml"
+    path.write_text(body, encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        load_takes(path)
+
+
+def test_repo_takes_file_is_valid():
+    from voru.pipeline import TAKES, load_takes
+
+    assert isinstance(load_takes(TAKES), dict)
+
+
+def test_synthesis_without_pack(subset, tmp_path):
+    report = run(subset, tmp_path, pack=False, allow_unreviewed=True)
+
+    assert report.stats["generated"] == 5
+    assert report.pack_dir is None
+    assert not (tmp_path / "packs").exists()

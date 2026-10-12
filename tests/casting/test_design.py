@@ -168,3 +168,12 @@ def test_provenance_records_prompt_and_batch(voices, tmp_path):
 def test_pick_unknown_candidate(voices, tmp_path):
     with pytest.raises(FileNotFoundError):
         pick_candidate(voices, "dryad-female", tmp_path / "work", seed=999, designer_revision="r", date="d")
+
+
+def test_candidates_record_generation_session(voices, tmp_path):
+    import json
+
+    (path,) = design_candidates(load_casting(voices), "dryad-female", FakeDesigner(), tmp_path / "work", count=1,
+                                session="2026-10-11T15:00")
+
+    assert json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))["session"] == "2026-10-11T15:00"

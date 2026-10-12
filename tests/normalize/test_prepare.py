@@ -126,3 +126,28 @@ def test_load_overrides_rejects_duplicate_keys(tmp_path: Path):
 
 def test_repo_overrides_file_is_valid():
     load_overrides()
+
+
+class FakeEngine:
+    def __call__(self, text):
+        return text.replace("Еще", "Ещ+ё").replace("раз", "р+аз").replace("Тенарон", "Т+енарон")
+
+
+def test_accents_are_applied_and_dictionary_wins(tmp_path):
+    from voru.normalize.accent import Accentuator
+
+    accentuator = Accentuator(tmp_path / "accents.jsonl", engine=FakeEngine())
+    dictionary = {"тенарон": Entry("Тенарон", "Тен+арон", "test")}
+
+    (variant,) = prepare_text("quest:1:accept", "Еще раз, $N, Тенарон ждет.", dictionary=dictionary,
+                              accentuator=accentuator)
+
+    assert variant.spoken_text == "Ещ+ё р+аз, Тен+арон ждет."
+
+
+def test_text_missing_from_accent_cache_is_blocked(tmp_path):
+    from voru.normalize.accent import Accentuator
+
+    result = prepare_text("quest:1:accept", "Новый текст.", accentuator=Accentuator(tmp_path / "accents.jsonl"))
+
+    assert result == Blocked("accent_missing")

@@ -3,11 +3,30 @@
 Один worker = один провайдер (одна модель в памяти). Мастер пишется в
 masters/<fingerprint>.wav — разные версии реплики физически не перезаписывают друг друга.
 """
+import dataclasses
 from pathlib import Path
 
 from voru.jobs.fingerprint import fingerprint
 from voru.providers.base import SynthesisRequest, UnsupportedOption, VoiceRef
 from voru.qa.audio import check_audio, verdict
+
+
+MAX_QA_RETRIES = 2  # брак QA перегенерируется со сдвинутым seed, не больше двух раз
+QA_SEED_STEP = 7919  # детерминированный сдвиг: попытка k использует seed + k * QA_SEED_STEP
+
+
+def _synthesize_with_qa(provider, request):
+    """Синтез + автопроверка; при браке — повтор с другим seed. Fingerprint остаётся базовым."""
+    base_seed = request.generation_config["seed"]
+    history = []
+    for attempt in range(1 + MAX_QA_RETRIES):
+        config = {**request.generation_config, "seed": base_seed + attempt * QA_SEED_STEP}
+        result = provider.synthesize(dataclasses.replace(request, generation_config=config))
+        state, reason = verdict(check_audio(result.path, request.text))
+        if state != "qa_failed":
+            break
+        history.append(reason)
+    return result, state, reason, {"seed_used": config["seed"], "qa_attempts": attempt + 1, "qa_history": history}
 
 
 def request_to_payload(request: SynthesisRequest, provider_name: str, normalization_revision: int) -> dict:
@@ -65,7 +84,7 @@ def run_worker(queue, provider, worker_id: str, masters_dir, lease_s: float = 60
             actual = fingerprint(provider.synthesis_input(request, job.payload["normalization_revision"]))
             if actual != job.fingerprint:
                 raise UnsupportedOption("fingerprint_mismatch", "входы синтеза изменились после постановки")
-            result = provider.synthesize(request)
+            result, state, reason, qa = _synthesize_with_qa(provider, request)
         except UnsupportedOption as err:
             queue.fail(job.job_id, worker_id, str(err), permanent=True)
         except Exception as err:  # noqa: BLE001 — любая ошибка модели: повтор по правилам очереди
@@ -78,10 +97,10 @@ def run_worker(queue, provider, worker_id: str, masters_dir, lease_s: float = 60
                 "model_revision": result.model_revision,
                 "elapsed_s": round(result.elapsed_s, 3),
                 "warnings": list(result.warnings),
+                **qa,
             })
             if queue.get(job.job_id).state == "superseded":  # текст сменился, пока шёл синтез
                 continue
-            state, reason = verdict(check_audio(result.path, request.text))
             if state != "generated":
                 queue.set_qa_state(job.job_id, state, reason)
             stats[state] += 1

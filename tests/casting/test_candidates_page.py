@@ -45,3 +45,20 @@ def test_page_shows_prompt_per_candidate(tmp_path):
     html = candidates_page(tmp_path).read_text(encoding="utf-8")
 
     assert "calm" in html and "energetic young woman" in html
+
+
+def test_page_shows_only_latest_session_by_default(tmp_path):
+    root = tmp_path / "voice_design"
+    for name, session in [("dryad-female/seed-10", "2026-10-11T13:00"), ("dryad-female/seed-11", "2026-10-11T14:00"),
+                          ("narrator/seed-20", "2026-10-11T13:00")]:
+        wav(root / f"{name}.wav", 6.0)
+        meta = root / f"{name}.json"
+        meta.write_text(json.dumps({"text": "Привет.", "instruct": "x", "seed": 1, "session": session}),
+                        encoding="utf-8")
+
+    latest = candidates_page(tmp_path).read_text(encoding="utf-8")
+    everything = candidates_page(tmp_path, latest_only=False).read_text(encoding="utf-8")
+
+    assert "seed-11.wav" in latest
+    assert "seed-10.wav" not in latest and "narrator" not in latest
+    assert "seed-10.wav" in everything and "narrator" in everything

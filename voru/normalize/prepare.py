@@ -1,5 +1,5 @@
 """Подготовка текста реплики: локаль → override → разметка → варианты пола → обращения →
-латинские двойники → числа → проверка остатков → словарь произношения.
+латинские двойники → числа → проверка остатков → ударения RUAccent → словарь произношения.
 
 Ничего не подставляется молча: нет русского текста, сломанная разметка, обращение внутри
 фразы или устаревшая правка дают Blocked с причиной (дизайн §5–6).
@@ -12,6 +12,7 @@ from typing import Optional
 import yaml
 
 from voru.config import REPO_ROOT
+from voru.normalize.accent import AccentAlignmentError, AccentMissing
 from voru.normalize.address import NeedsOverride, speak
 from voru.normalize.markup import MarkupError, expand_player_gender, parse
 from voru.normalize.numbers import expand_numbers
@@ -57,7 +58,7 @@ def load_overrides(path=OVERRIDES_PATH) -> dict:
 
 
 def prepare_text(content_key: str, raw_text: Optional[str], overrides: Optional[dict] = None,
-                 dictionary: Optional[dict] = None):
+                 dictionary: Optional[dict] = None, accentuator=None):
     """Возвращает кортеж Variant либо Blocked."""
     if raw_text is None or not raw_text.strip():
         return Blocked("missing_locale")
@@ -71,11 +72,17 @@ def prepare_text(content_key: str, raw_text: Optional[str], overrides: Optional[
 
     try:
         variants = expand_player_gender(parse(source))
-        return tuple(Variant(gender, _spoken(tokens, dictionary)) for gender, tokens in variants.items())
+        return tuple(Variant(gender, _spoken(tokens, dictionary, accentuator)) for gender, tokens in variants.items())
     except (MarkupError, NeedsOverride) as err:
         return Blocked(err.reason, str(err))
+    except AccentMissing as err:
+        return Blocked("accent_missing", str(err))
+    except AccentAlignmentError as err:
+        return Blocked("accent_alignment", str(err))
 
 
-def _spoken(tokens, dictionary):
+def _spoken(tokens, dictionary, accentuator=None):
     text = check_residue(expand_numbers(fix_homoglyphs(speak(tokens))))
-    return apply_dictionary(text, dictionary or {})
+    if accentuator is not None:
+        text = accentuator(text)  # ударения и «ё» RUAccent
+    return apply_dictionary(text, dictionary or {})  # словарь — последнее слово

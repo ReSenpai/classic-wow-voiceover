@@ -169,8 +169,9 @@ class JobQueue:
         with self._tx() as db:
             row = self._owned_running(job_id, worker)
             newer = db.execute("SELECT 1 FROM jobs WHERE slot = ? AND job_id > ?", (row["slot"], job_id)).fetchone()
+            # last_error не затираем: прошлый сбой попытки полезен для разбора
             self._update(job_id, state="superseded" if newer else "generated", lease_owner=None,
-                         lease_expires=None, last_error=None, result=json.dumps(result, ensure_ascii=False))
+                         lease_expires=None, result=json.dumps(result, ensure_ascii=False))
 
     def fail(self, job_id: int, worker: str, error: str, permanent: bool = False):
         with self._tx():

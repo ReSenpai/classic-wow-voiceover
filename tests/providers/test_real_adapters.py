@@ -142,6 +142,62 @@ def test_f5_keeps_stress_marks_and_passes_seed(tmp_path, reference):
     assert call["nfe_step"] == 48
 
 
+def test_f5_text_is_chunked_by_sentences_with_pauses(tmp_path):
+    """Регрессия «обрыв на "Может,"»: F5 сам резал по запятой — режем по предложениям сами."""
+    from voru.normalize.chunking import PARAGRAPH_PAUSE_S, SENTENCE_PAUSE_S
+
+    ref = tmp_path / "long_ref.wav"
+    with wave.open(str(ref), "wb") as w:  # 10 с референса, транскрипт 72 байта → лимит ~86 байт
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(24000)
+        w.writeframes(b"\x00\x00" * 240000)
+    text = "Принеси мне ростки. Может, позже ты ещё увидишь результаты!\n\nСпасибо."
+    req = SynthesisRequest(text=text, locale="ruRU", player_gender=None,
+                           voice=VoiceRef("v", "1", ref, "Пусть луна осветит твой путь, странник."),
+                           delivery_profile="neutral",
+                           generation_config={"seed": 7}, output_path=tmp_path / "out.wav")
+    fake = FakeF5()
+
+    result = loaded(F5RuV4Provider(), fake).synthesize(req)
+
+    assert [c["gen_text"] for c in fake.calls] == [
+        "Принеси мне ростки.", "Может, позже ты ещё увидишь результаты!", "Спасибо."]
+    assert all(c["seed"] == 7 for c in fake.calls)
+    pause_ms = int((SENTENCE_PAUSE_S + PARAGRAPH_PAUSE_S) * 1000)
+    assert result.duration_ms == 3 * 200 + pause_ms
+
+
+class PaddedF5(FakeF5):
+    """Как настоящий F5: каждый кусок с ~0.5 с тишины по краям."""
+    def infer(self, **kwargs):
+        self.calls.append(kwargs)
+        silence = [0.0] * 12000
+        return silence + [0.2, -0.2] * 2400 + silence, 24000, None
+
+
+def test_f5_trims_chunk_edge_silence_so_pause_is_ours(tmp_path):
+    """Регрессия: тишина кусков + наша пауза давали 1.5–2.2 с на границах абзацев (QA long_pause)."""
+    from voru.normalize.chunking import PARAGRAPH_PAUSE_S
+    from voru.providers.f5_ru import EDGE_KEEP_S
+    from voru.qa.audio import check_audio
+
+    req = SynthesisRequest(text="Готово.\n\nТеперь иди.", locale="ruRU", player_gender=None,
+                           voice=VoiceRef("v", "1", tmp_path / "ref.wav", "Пусть луна осветит твой путь."),
+                           delivery_profile="neutral", generation_config={"seed": 1}, output_path=tmp_path / "out.wav")
+    with wave.open(str(tmp_path / "ref.wav"), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(24000)
+        w.writeframes(b"\x00\x00" * 24000 * 5)
+
+    result = loaded(F5RuV4Provider(), PaddedF5()).synthesize(req)
+
+    expected_ms = 2 * 200 + (PARAGRAPH_PAUSE_S + 4 * EDGE_KEEP_S) * 1000
+    assert abs(result.duration_ms - expected_ms) <= 2
+    assert [f.reason for f in check_audio(result.path, req.text)] == []
+
+
 def test_f5_loads_pinned_checkpoint_vocab_and_vocoder(monkeypatch):
     import sys
     import types

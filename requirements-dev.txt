@@ -5,3 +5,6 @@ PyYAML>=6
 pymorphy3>=2
 imageio-ffmpeg>=0.5
 mutagen>=1.47
+# RUAccent: stress and yo marks (needs transformers 4.x; cache is in corpus/accents.jsonl).
+ruaccent>=1.5.8
+transformers<5

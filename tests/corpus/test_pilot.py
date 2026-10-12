@@ -73,3 +73,32 @@ def test_all_pilot_lines_prepare_with_repo_overrides(pilot):
             blocked[r.text_key] = result.reason
 
     assert blocked == {}
+
+
+@pytest.fixture(scope="module")
+def spoken_pilot(pilot):
+    """Устный текст пилота с ударениями из кэша RUAccent и словарём — как его получит F5."""
+    from voru.normalize.accent import Accentuator
+    from voru.normalize.prepare import load_overrides, prepare_text
+    from voru.normalize.pronunciation import load_dictionary
+
+    accentuator, overrides, dictionary = Accentuator(), load_overrides(), load_dictionary()
+    return "\n".join(v.spoken_text for r in pilot
+                     for v in prepare_text(r.text_key, r.raw_text, overrides, dictionary, accentuator))
+
+
+# Замечания из слепого прослушивания F5 v2/v4 (11.10.2026): ошибка модели → правильная форма.
+@pytest.mark.parametrize("wrong, right", [
+    ("кр+ивой", "крив+ой"), ("С+осны", "Сосн+ы"), ("вс+е ", "вс+ё"), ("з+ападню", "западн+ю"), ("н+айди", "найд+и"),
+    ("хр+анят", "хран+ят"), ("р+остки", "ростк+и"), ("р+осток", "рост+ок"), ("выр+астить", "в+ырастить"),
+    ("п+оражено", "поражен+о"), ("с+уществ", "сущ+еств"), ("н+абери", "набер+и"), ("пр+одолжу", "прод+олжу"),
+    ("жив+ет", "жив+ёт"), ("замысл+ы", "з+амыслы"),
+    ("межд+у", "м+ежду"), ("саженц+ах", "с+аженцах"),  # норма по решению пользователя
+    # A/B F5 v4 против Qwen (12.10.2026): ошибки разметки RUAccent и слова без ударения
+    ("сов+ет лес+а", "сов+ет л+еса"), ("зв+ёздного ветр+а", "зв+ёздного в+етра"), ("нордр+ассил", "нордрасс+ил"),
+    ("гонца", "гонц+а"), ("порча", "п+орча"),
+])
+def test_user_reported_stress_errors_are_fixed(spoken_pilot, wrong, right):
+    lower = spoken_pilot.lower()
+    assert wrong.lower() not in lower
+    assert right.lower() in lower
