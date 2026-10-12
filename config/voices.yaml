@@ -142,6 +142,8 @@ casting:
     creature:2150: satyr-male          # Зенн Грязное Копыто — раса модели неизвестна
     creature:3516: nightelf-male-elder # Верховный друид Фэндрал Олений Шлем
     creature:1992: dryad-female        # Тариндрелла — дриада, раса модели неизвестна
+    creature:3597: nightelf-male-elder # Мардант Крепкий Дуб — наставник друидов (приёмка 12.10.2026)
+    creature:8584: nightelf-male-elder # Иверрон — друид, умирает от яда: усталый голос (приёмка 12.10.2026)
   archetypes:
     - match: Часовой
       race: 4

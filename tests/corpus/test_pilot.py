@@ -101,11 +101,38 @@ def spoken_pilot(pilot):
     ("дух+и", "д+ухи"), ("но вест+и", "но в+ести"), ("в н+ем", "в н+ём"), ("изер+ой", "из+ерой"),
     ("дру+идами-в+оронами", "дру+идами, в+оронами"), ("+ах, так, зн+ачит", "+ах, так зн+ачит"),
     # второй круг приёмки F5 (12.10.2026): произношение пользователя вместо нормы
-    ("добыл+а", "доб+ыла"), ("лес+у", "л+есу"),
+    ("добыл+а", "доб+ыла"), ("по лес+у", "по л+есу"),
     ("а, рост+ок", "а... рост+ок"),  # пауза после «А»: F5 не держит её на запятой
     ("бо+юсь", "боюсь"),  # F5 дважды обрывал «Бо+юсь» на «Бо» — знак снят, ударение по модели
 ])
 def test_user_reported_stress_errors_are_fixed(spoken_pilot, wrong, right):
     lower = spoken_pilot.lower()
+    assert wrong.lower() not in lower
+    assert right.lower() in lower
+
+
+@pytest.fixture(scope="module")
+def spoken_smoke():
+    """То же для смоук-корпуса Тенистой долины."""
+    from voru.normalize.accent import Accentuator
+    from voru.normalize.prepare import load_overrides, prepare_text
+    from voru.normalize.pronunciation import load_dictionary
+
+    accentuator, overrides, dictionary = Accentuator(), load_overrides(), load_dictionary()
+    return "\n".join(v.spoken_text for r in read_jsonl(REPO_ROOT / "corpus" / "smoke" / "shadowglen.jsonl")
+                     for v in prepare_text(r.text_key, r.raw_text, overrides, dictionary, accentuator))
+
+
+# Приёмка Тенистой долины (12.10.2026)
+@pytest.mark.parametrize("wrong, right", [
+    ("элуна", "эл+уна"), ("элуне", "эл+уне"), ("калимдора", "калимд+ора"),
+    ("в л+есу", "в лес+у"),  # «по л+есу», но «в лес+у»
+    ("мне с+амому", "мне самом+у"),  # местоимение «сам», не «самый»
+    # пауза после междометия / перед переспросом: F5 не держит её на запятой
+    ("+о, отл+ично", "+о... отл+ично"), ("т+ы, не т+ак ли", "т+ы... не т+ак ли"), ("а, пон+ятно", "+а... пон+ятно"),
+    ("+этих +этих", "на +этих б+есов"),  # повтор слова в игровом тексте — правка в overrides
+])
+def test_shadowglen_acceptance_fixes(spoken_smoke, wrong, right):
+    lower = spoken_smoke.lower()
     assert wrong.lower() not in lower
     assert right.lower() in lower

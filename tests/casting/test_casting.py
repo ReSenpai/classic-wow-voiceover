@@ -208,6 +208,15 @@ def test_repo_casting_is_valid():
     load_casting()
 
 
+@pytest.mark.parametrize("npc_id", [3597, 8584])  # Мардант Крепкий Дуб, Иверрон
+def test_shadowglen_druids_speak_with_druid_voice(npc_id):
+    """Приёмка Тенистой долины 12.10.2026: наставник друидов и отравленный Иверрон — голос друида."""
+    smoke = read_jsonl(REPO_ROOT / "corpus" / "smoke" / "shadowglen.jsonl")
+    record = next(r for r in smoke if r.npc_id == npc_id)
+
+    assert cast(record, load_casting()).voice_id == "nightelf-male-elder"
+
+
 def test_every_pilot_speaker_has_a_voice():
     casting = load_casting()
     pilot = read_jsonl(REPO_ROOT / "corpus" / "pilot" / "teldrassil.jsonl")

@@ -2,6 +2,7 @@
 # Синтез пилота настоящими моделями в WSL (без сборки пака):
 #   bash scripts/wsl/pilot_synth.sh f5 f5-tts-ru-v4 f5-tts-ru-v2
 #   bash scripts/wsl/pilot_synth.sh qwen qwen3-tts-base
+#   CORPUS=corpus/smoke/shadowglen.jsonl bash scripts/wsl/pilot_synth.sh f5 f5-tts-ru-v4   # другой корпус
 # Очередь и мастера — ~/voru-work (диск WSL: SQLite на /mnt/c ненадёжен). Лог — work/pilot_<env>.log.
 set -euo pipefail
 ENV_NAME="${1:?окружение: qwen | f5}"; shift
@@ -15,7 +16,7 @@ if [ -d work/recordings ]; then
 fi
 for provider in "$@"; do
   echo "== $provider $(date -Is)" | tee -a "work/pilot_$ENV_NAME.log"
-  "$PY" -m voru.pipeline --provider "$provider" --corpus corpus/pilot/teldrassil.jsonl \
+  "$PY" -m voru.pipeline --provider "$provider" --corpus "${CORPUS:-corpus/pilot/teldrassil.jsonl}" \
     --work-dir "$HOME/voru-work" --no-pack 2>&1 | grep -E "синтез:|заблокировано|нет голоса|Error|Traceback" \
     | tee -a "work/pilot_$ENV_NAME.log"
   echo "== $provider done $(date -Is)" | tee -a "work/pilot_$ENV_NAME.log"
