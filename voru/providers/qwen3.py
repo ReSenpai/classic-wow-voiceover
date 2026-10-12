@@ -2,14 +2,35 @@
 
 Ставится в отдельное окружение WSL: scripts/wsl/setup_env.sh qwen. Ударения «+» модель
 не понимает — снимаются до синтеза (и до fingerprint). Веса закреплены по ревизии HF.
+
+Qwen3StressProvider — та же Base, дообученная на русские ударения (LoRA, слитый чекпоинт,
+Apache-2.0): ставит ударение по знаку U+0301 после гласной, в т.ч. против словаря.
 """
+import dataclasses
+import re
+
 from voru.providers.base import Capabilities, Provider
 
 QWEN_BASE_REPO = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
 QWEN_BASE_REVISION = "fd4b254389122332181a7c3db7f27e918eec64e3"
 QWEN_DESIGN_REPO = "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign"
 QWEN_DESIGN_REVISION = "5ecdb67327fd37bb2e042aab12ff7391903235d3"
+QWEN_STRESS_REPO = "siriusfreak/qwen3-tts-12hz-1.7b-ru-stress-cf"
+QWEN_STRESS_REVISION = "c16b3af3db3095120efc1ebb73f6522442bcb3b1"
 LANGUAGES = {"ru": "Russian"}
+ACUTE = "́"
+_STRESS = re.compile(r"\+(.?)")
+_VOWELS = set("аеёиоуыэюяАЕЁИОУЫЭЮЯ")
+
+
+def to_combining_acute(text: str) -> str:
+    """«+» перед ударной гласной (наш формат, RUAccent) → U+0301 после неё (формат дообученной Qwen)."""
+    def repl(match):
+        vowel = match.group(1)
+        if vowel not in _VOWELS:
+            raise ValueError(f"знак ударения не перед гласной: {text[max(0, match.start() - 10):match.end() + 10]!r}")
+        return vowel + ACUTE
+    return _STRESS.sub(repl, text)
 
 
 def load_pinned(repo: str, revision: str):
@@ -71,6 +92,20 @@ class Qwen3BaseProvider(Provider):
             **config,
         )
         return wavs[0], sample_rate
+
+
+class Qwen3StressProvider(Qwen3BaseProvider):
+    name = "qwen3-tts-ru-stress"
+    default_capabilities = dataclasses.replace(Qwen3BaseProvider.default_capabilities, stress_marks=True)
+
+    def model_revision(self) -> str:
+        return f"{QWEN_STRESS_REPO}@{QWEN_STRESS_REVISION}"
+
+    def model_text(self, request) -> str:
+        return to_combining_acute(super().model_text(request))
+
+    def _load(self):
+        self._model = load_pinned(QWEN_STRESS_REPO, QWEN_STRESS_REVISION)
 
 
 class QwenVoiceDesigner:

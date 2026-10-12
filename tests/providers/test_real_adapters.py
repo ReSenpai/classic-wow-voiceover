@@ -126,6 +126,53 @@ def test_qwen_loads_from_pinned_snapshot(monkeypatch):
     assert kwargs["dtype"] == "bf16"
 
 
+# --- Qwen3-TTS Base, дообученная на ударения (siriusfreak/…-ru-stress-cf) ---
+
+@pytest.mark.parametrize("marked, expected", [
+    ("Тельдрасс+ил ждёт.", "Тельдрасси́л ждёт."),
+    ("+Этот З+енн", "Э́тот Зе́нн"),
+    ("вс+ё, ещ+Ё", "всё́, ещЁ́"),
+    ("без ударений", "без ударений"),
+])
+def test_stress_marks_become_combining_acute_after_vowel(marked, expected):
+    from voru.providers.qwen3 import to_combining_acute
+
+    assert to_combining_acute(marked) == expected
+
+
+def test_qwen_stress_passes_acute_marks_to_model(tmp_path, reference):
+    from voru.providers.qwen3 import Qwen3StressProvider
+
+    fake = FakeQwen()
+    provider = loaded(Qwen3StressProvider(), fake)
+
+    provider.synthesize(request(tmp_path, reference, text="Тельдр+ассил ждёт."))
+
+    (call,) = fake.calls
+    assert call["text"] == "Тельдра́ссил ждёт."
+    assert call["language"] == "Russian"
+    assert provider.capabilities.stress_marks
+
+
+def test_qwen_stress_is_pinned_and_differs_from_base(tmp_path, reference):
+    from voru.jobs.fingerprint import fingerprint
+    from voru.providers.qwen3 import QWEN_STRESS_REPO, QWEN_STRESS_REVISION, Qwen3StressProvider
+
+    req = request(tmp_path, reference)
+
+    assert Qwen3StressProvider().model_revision() == f"{QWEN_STRESS_REPO}@{QWEN_STRESS_REVISION}"
+    assert len(QWEN_STRESS_REVISION) == 40
+    assert fingerprint(Qwen3StressProvider().synthesis_input(req, 1)) != \
+        fingerprint(Qwen3BaseProvider().synthesis_input(req, 1))
+
+
+def test_stress_mark_on_non_vowel_is_an_error():
+    from voru.providers.qwen3 import to_combining_acute
+
+    with pytest.raises(ValueError):
+        to_combining_acute("Сл+ава +!")
+
+
 # --- F5-TTS Russian ---
 
 def test_f5_keeps_stress_marks_and_passes_seed(tmp_path, reference):
@@ -259,10 +306,12 @@ def test_f5_variants_have_different_fingerprints(tmp_path, reference):
 # --- реестр: тяжёлые модули не импортируются до _load ---
 
 @pytest.mark.parametrize("name, cls", [
-    ("qwen3-tts-base", Qwen3BaseProvider), ("f5-tts-ru-v2", F5RuV2Provider), ("f5-tts-ru-v4", F5RuV4Provider),
+    ("qwen3-tts-base", Qwen3BaseProvider), ("qwen3-tts-ru-stress", None), ("f5-tts-ru-v2", F5RuV2Provider), ("f5-tts-ru-v4", F5RuV4Provider),
 ])
 def test_registry_names(name, cls):
+    from voru.providers.qwen3 import Qwen3StressProvider
+
     provider = get_provider(name)
 
-    assert isinstance(provider, cls)
+    assert isinstance(provider, cls or Qwen3StressProvider)
     assert provider.name == name

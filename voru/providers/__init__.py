@@ -4,6 +4,7 @@ import importlib
 _REGISTRY = {
     "mock": "voru.providers.mock:MockProvider",
     "qwen3-tts-base": "voru.providers.qwen3:Qwen3BaseProvider",
+    "qwen3-tts-ru-stress": "voru.providers.qwen3:Qwen3StressProvider",
     "f5-tts-ru-v2": "voru.providers.f5_ru:F5RuV2Provider",
     "f5-tts-ru-v4": "voru.providers.f5_ru:F5RuV4Provider",
 }
