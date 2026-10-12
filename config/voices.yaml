@@ -76,10 +76,10 @@ voices:
       - Не бойся, ты не один в этом пути.
 
   - voice_id: satyr-male
-    revision: "6"
+    revision: "7"
     reference_audio: "voice_refs/satyr-male.wav"
-    reference_text: "Ха-ха! Хорошая работёнка, ничего не скажешь! Кто бы мог подумать, что ты так легко согласишься помочь."
-    provenance: "Qwen3-TTS VoiceDesign Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign@5ecdb67327fd37bb2e042aab12ff7391903235d3, seed 49540853 (батч 49540849, №5 из 8), 2026-10-12; описание: A male fantasy satyr speaking fluent, natural Russian. A medium-low voice with a coarse, throaty rasp, dark resonance, and a faint animalistic edge. Lean and wiry in vocal character, with tightly controlled breath and occasional guttural undertones. The delivery is sly, mocking, and maliciously playful. He sounds like an ancient forest trickster corrupted by demonic magic, enjoying every opportunity to tempt, deceive, or unsettle the listener. Even friendly words carry a concealed threat. Use intimate, conspiratorial phrasing, deliberate pauses, and slightly elongated vowels when teasing or making an offer. Let certain phrases end in a dry, sneering chuckle. Brief snorts and a subtle goat-like catch in the throat may appear during laughter, but avoid literal bleating. When anger breaks through, shift abruptly from silky mockery into a harsh, snarling bark. Increase vocal tension and roughness while keeping every word intelligible. His menace comes from cunning and unpredictability as much as aggression. Natural Russian pronunciation with clear consonants and expressive, conversational phrasing. Close, dry studio recording. Keep the supernatural character in the performance itself. Avoid an excessively deep demon bass, a heroic warrior tone, constant growling, cartoonish goat noises, exaggerated hissing, heavy reverb, layered voices, or electronic distortion."
+    reference_text: "Хе-хе... Ну что ты, дружок, не бойся, я всегда держу своё слово. А за маленькую услугу получишь то, о чём другие только шепчутся."
+    provenance: "Qwen3-TTS VoiceDesign Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign@5ecdb67327fd37bb2e042aab12ff7391903235d3, seed 49540863 (батч 49540857, №7 из 8), 2026-10-12; описание: A male fantasy satyr speaking fluent, natural Russian. A medium-low voice with a coarse, throaty rasp, dark resonance, and a faint animalistic edge. Lean and wiry in vocal character, with tightly controlled breath and occasional guttural undertones. The delivery is sly, mocking, and maliciously playful. He sounds like an ancient forest trickster corrupted by demonic magic, enjoying every opportunity to tempt, deceive, or unsettle the listener. Even friendly words carry a concealed threat. Use intimate, conspiratorial phrasing, deliberate pauses, and slightly elongated vowels when teasing or making an offer. Let certain phrases end in a dry, sneering chuckle. Brief snorts and a subtle goat-like catch in the throat may appear during laughter, but avoid literal bleating. When anger breaks through, shift abruptly from silky mockery into a harsh, snarling bark. Increase vocal tension and roughness while keeping every word intelligible. His menace comes from cunning and unpredictability as much as aggression. Natural Russian pronunciation with clear consonants and expressive, conversational phrasing. Close, dry studio recording. Keep the supernatural character in the performance itself. Avoid an excessively deep demon bass, a heroic warrior tone, constant growling, cartoonish goat noises, exaggerated hissing, heavy reverb, layered voices, or electronic distortion."
     license: "Apache-2.0 (модель Qwen3-TTS); голос сгенерирован проектом"
     sex: male
     description: >-
@@ -106,9 +106,9 @@ voices:
       studio recording. Keep the supernatural character in the performance itself.
       Avoid an excessively deep demon bass, a heroic warrior tone, constant growling, cartoonish goat noises,
       exaggerated hissing, heavy reverb, layered voices, or electronic distortion.
-    test_lines:
-      - Ха-ха! Хорошая работёнка, ничего не скажешь!
-      - Кто бы мог подумать, что ты так легко согласишься помочь.
+    test_lines:  # насмешливые, не из корпуса; смешок в начале — чтобы F5 перенимал его на «хе-хе» в репликах
+      - Хе-хе... Ну что ты, дружок, не бойся, я всегда держу своё слово.
+      - А за маленькую услугу получишь то, о чём другие только шепчутся.
 
   - voice_id: dryad-female
     revision: "2"
