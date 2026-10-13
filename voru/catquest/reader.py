@@ -57,7 +57,7 @@ class SourcePack:
     json_only_quests: list = field(default_factory=list)  # есть в index.json, но CatQuest их не играет
 
 
-class _Files:
+class PackFiles:
     """Единый доступ к папке и ZIP; пути — относительно папки модуля."""
 
     def __init__(self, source: Path):
@@ -152,7 +152,7 @@ def _entry_lines(quest_id, stage, entry, files, where):
 
 def read_pack(source) -> SourcePack:
     source = Path(source)
-    files = _Files(source)
+    files = PackFiles(source)
     version = _toc_version(files.read(f"{MODULE_DIR}.toc").decode("utf-8"))
     try:
         env = parse_assignments(files.read(INDEX_FILE).decode("utf-8"), INDEX_FILE)

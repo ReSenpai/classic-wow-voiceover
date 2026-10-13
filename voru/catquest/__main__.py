@@ -2,7 +2,7 @@
 import importlib
 import sys
 
-COMMANDS = {"inspect": "voru.catquest.inspect"}
+COMMANDS = {"inspect": "voru.catquest.inspect", "match": "voru.catquest.match", "review": "voru.catquest.review"}
 
 
 def main(argv=None):

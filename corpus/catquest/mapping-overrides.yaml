@@ -1,0 +1,14 @@
+# Ручные решения сопоставления CatQuest → целевой корпус (дизайн CQ §7).
+# Решение привязано к хэшам текста CatQuest, текста корпуса и звука: что-то изменилось — запись
+# снова needs_review (stale_override), старое подтверждение молча не переносится.
+#
+# - quest_id: <id>
+#   stage: accept | complete
+#   player_gender: null | m | f   # пол игрока, как у файла CatQuest
+#   source_text_sha256: <из mapping.jsonl>
+#   target_text_sha256: <из mapping.jsonl>
+#   source_audio_sha256: <из mapping.jsonl>
+#   decision: approved_variant | content_mismatch
+#   reason: <что отличается и почему допустимо/нет>
+#   reviewer: <кто слушал>
+[]
