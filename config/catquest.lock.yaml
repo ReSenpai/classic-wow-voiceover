@@ -1,0 +1,37 @@
+# Зафиксированный вход переноса CatQuest Voices (дизайн CQ §2). Изменился архив → inspect падает
+# с LockMismatch: результаты старой проверки и ручные решения на новый вход молча не переносятся.
+# Архивы не в git: work/catquest/input/ (скачивает пользователь).
+
+source:
+  name: CatQuest Voices
+  version: "0.6.1"
+  curseforge_project_id: 1715207
+  curseforge_file_id: 9142066
+  url: https://www.curseforge.com/wow/addons/catquest-voices/files/9142066
+  archive: CatQuest_Voices-0.6.1.zip
+  sha256: a5c17a2379eeb32fe8e73b0a3c0b2d592a006ee20aae3fe988fe47d0471a671a
+  author: daniilcathey (Cathey)
+  license: CC BY-NC-SA 4.0
+  license_url: https://creativecommons.org/licenses/by-nc-sa/4.0/
+  toc_interface: 16001
+  note: >-
+    Схема проверена 13.10.2026: Index.lua (играет CatQuest, с субтитрами c, без модели m) + index.json
+    (без c, с m; ещё 61 квест «только сдача», которых нет в Index.lua). 3030 квестов, 7733 реплики,
+    7807 OGG (74 без записи в Index.lua). Модели: eleven_v4 или пусто у старых записей.
+
+consumer_reference:  # только как справка о правилах имён; код не копируем
+  name: CatQuest
+  version: "0.6.4"
+  curseforge_project_id: 1715196
+  curseforge_file_id: 9142154
+  archive: CatQuest-0.6.4.zip
+  sha256: 589a11246e2455ef69364cd5f1365155c140154c500a73d23e8eeb2693f3f140
+  license: MIT
+
+voiceover:
+  base_commit: f5476e726af4e483f14ec33d324366c5cf7035d2
+  installed_version: "1.4.5"  # _classic_era_/Interface/AddOns/AI_VoiceOver, 13.10.2026
+
+target:
+  profile: forever-ruru
+  client: config/client.yaml  # 1.15.9 build 70003, Interface 11509, ruRU
